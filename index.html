@@ -1,0 +1,822 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>NetFlow</title>
+
+  <link rel="icon" type="image/png" sizes="32x32" href="./assets/icons/favicon-32x32.png">
+  <link rel="apple-touch-icon" href="./assets/icons/netflow-favicon.png">
+
+  <link rel="stylesheet" href="./css/styles.css">
+</head>
+
+<body>
+  <div id="app">
+    <div id="topbar">
+      <div class="logo">
+        <svg class="logo-svg" id="logo" xmlns="http://www.w3.org/2000/svg" role="img" viewBox="0 0 84 96">
+          <title>NetFlow Logo</title>
+          <g transform="translate(-8.000000, -2.000000)">
+            <g transform="translate(11.000000, 5.000000)">
+              <polygon
+                stroke="currentColor"
+                stroke-width="5"
+                stroke-linecap="round"
+                stroke-linejoin="round"
+                fill="none"
+                points="39 0 0 22 0 67 39 90 78 68 78 23"
+              />
+              <path
+                d="M48.241667,28.8 L48.241667,33.6 L33.841667,33.6 L33.841667,42.2 L46.991667,42.2 L46.991667,46.6 L33.841667,46.6 L33.841667,56.2 L48.241667,56.2 L48.241667,60.8 L28.791667,60.8 L28.791667,28.8 Z"
+                fill="currentColor"
+              />
+            </g>
+          </g>
+        </svg>
+        <span>NETFLOW</span>
+      </div>
+
+      <button id="menuToggleBtn" class="menu-icon-only" onclick="toggleSidebar()" aria-label="Toggle menu">
+        <svg xmlns="http://www.w3.org/2000/svg" class="menu-svg" viewBox="0 0 24 24" fill="currentColor">
+          <path stroke="none" d="M0 0h24v24H0z" fill="none" />
+          <path d="M21 6a1 1 0 0 1 -1 1h-16a1 1 0 1 1 0 -2h16a1 1 0 0 1 1 1" />
+          <path d="M21 12a1 1 0 0 1 -1 1h-16a1 1 0 0 1 0 -2h16a1 1 0 0 1 1 1" />
+          <path d="M21 18a1 1 0 0 1 -1 1h-16a1 1 0 0 1 0 -2h16a1 1 0 0 1 1 1" />
+        </svg>
+      </button>
+
+      <div class="desktop-menu-bar">
+        <button id="fileBtn" class="desktop-menu-btn" onclick="toggleExportMenu()">File ▾</button>
+        <button id="editBtn" class="desktop-menu-btn" onclick="toggleEditMenu()">Edit ▾</button>
+        <button id="sizeBtn" class="desktop-menu-btn" onclick="toggleSizeMenu()">View ▾</button>
+      </div>
+
+      <div class="sep"></div>
+
+      <div class="connection-action-group" aria-label="Connection actions">
+        <button
+          id="addConnectionActionBtn"
+          class="connection-action-btn add disabled"
+          onclick="handleConnectionAddButton()"
+          title="Select a device to add a connection"
+          aria-label="Add connection"
+        >
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor">
+            <path stroke="none" d="M0 0h24v24H0z" fill="none" />
+            <path d="M12 4a1 1 0 0 1 1 1v6h6a1 1 0 0 1 0 2h-6v6a1 1 0 0 1 -2 0v-6h-6a1 1 0 0 1 0 -2h6v-6a1 1 0 0 1 1 -1" />
+          </svg>
+        </button>
+
+        <button
+          id="removeConnectionActionBtn"
+          class="connection-action-btn remove disabled"
+          onclick="handleConnectionRemoveButton()"
+          title="Select a connection line to remove it"
+          aria-label="Remove connection"
+        >
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
+            <path stroke="none" d="M0 0h24v24H0z" fill="none" />
+            <path d="M5 12l14 0" />
+          </svg>
+        </button>
+      </div>
+
+      <div class="spacer"></div>
+      <span id="recDot"></span>
+      <span id="status">READY</span>
+    </div>
+
+    <div id="sizeMenu" class="floating-menu">
+      <div class="menu-title">Diagram Appearance</div>
+
+      <div class="menu-row">
+        <label>Font Size</label>
+        <input id="fontSizeInput" type="range" min="10" max="30" step="1" value="16" oninput="setFontSize(this.value)"/>
+        <span id="fontSizeValue" class="menu-val">16pt</span>
+      </div>
+
+      <div class="menu-row">
+        <label>Box / Line Scale</label>
+        <input id="boxScaleInput" type="range" min=".75" max="1.8" step=".05" value="1" oninput="setBoxScale(this.value)"/>
+        <span id="boxScaleValue" class="menu-val">1.00x</span>
+      </div>
+
+      <button class="export-item" onclick="resetDiagramSizing()">
+        Reset sizing<span class="export-sub">Back to readable defaults</span>
+      </button>
+    </div>
+
+    <div id="exportMenu" class="floating-menu">
+      <button class="export-item" onclick="saveProject();closeExportMenu()">
+        Save Project<span class="export-sub">Save locally in this browser</span>
+      </button>
+
+      <button class="export-item" onclick="loadProject();closeExportMenu()">
+        Load Project<span class="export-sub">Load local saved diagram</span>
+      </button>
+
+      <div class="export-divider"></div>
+
+      <button class="export-item" onclick="exportPNG();closeExportMenu()">
+        PNG Image<span class="export-sub">Still screenshot</span>
+      </button>
+
+      <button class="export-item" onclick="exportWebM();closeExportMenu()">
+        WebM Video<span class="export-sub">Best for portfolio website</span>
+      </button>
+
+      <button class="export-item" onclick="exportMP4();closeExportMenu()">
+        MP4 Video<span class="export-sub">Best for sharing/uploads</span>
+      </button>
+
+      <div class="export-divider"></div>
+
+      <button class="export-item" onclick="openJsonModal();closeExportMenu()">
+        JSON Backup<span class="export-sub">Export/import editable topology</span>
+      </button>
+    </div>
+
+    <div id="editMenu" class="floating-menu desktop-edit-menu">
+      <button class="edit-menu-item" onclick="undo();closeEditMenu()">
+        <span class="edit-menu-icon">
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
+            <path stroke="none" d="M0 0h24v24H0z" fill="none"/>
+            <path d="M18 18v-6a3 3 0 0 0 -3 -3h-10l4 -4m0 8l-4 -4"/>
+          </svg>
+        </span>
+        <span>Undo</span>
+      </button>
+
+      <button class="edit-menu-item" onclick="redo();closeEditMenu()">
+        <span class="edit-menu-icon">
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
+            <path stroke="none" d="M0 0h24v24H0z" fill="none"/>
+            <path d="M6 18v-6a3 3 0 0 1 3 -3h10l-4 -4m0 8l4 -4"/>
+          </svg>
+        </span>
+        <span>Redo</span>
+      </button>
+
+      <div class="export-divider"></div>
+
+      <button class="edit-menu-item" onclick="copySelectedItems('cut');closeEditMenu()">
+        <span class="edit-menu-icon">
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.1" stroke-linecap="round" stroke-linejoin="round">
+            <path stroke="none" d="M0 0h24v24H0z" fill="none" />
+            <path d="M3 7a3 3 0 1 0 6 0a3 3 0 1 0 -6 0" />
+            <path d="M3 17a3 3 0 1 0 6 0a3 3 0 1 0 -6 0" />
+            <path d="M8.6 8.6l10.4 10.4" />
+            <path d="M8.6 15.4l10.4 -10.4" />
+          </svg>
+        </span>
+        <span>Cut</span>
+      </button>
+
+      <button class="edit-menu-item" onclick="copySelectedItems('copy');closeEditMenu()">
+        <span class="edit-menu-icon">
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.1" stroke-linecap="round" stroke-linejoin="round">
+            <path stroke="none" d="M0 0h24v24H0z" fill="none" />
+            <path d="M7 9.667a2.667 2.667 0 0 1 2.667 -2.667h8.666a2.667 2.667 0 0 1 2.667 2.667v8.666a2.667 2.667 0 0 1 -2.667 2.667h-8.666a2.667 2.667 0 0 1 -2.667 -2.667l0 -8.666" />
+            <path d="M4.012 16.737a2.005 2.005 0 0 1 -1.012 -1.737v-10c0 -1.1 .9 -2 2 -2h10c.75 0 1.158 .385 1.5 1" />
+          </svg>
+        </span>
+        <span>Copy</span>
+      </button>
+
+      <button class="edit-menu-item" onclick="pasteClipboardItems();closeEditMenu()">
+        <span class="edit-menu-icon">
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor">
+            <path stroke="none" d="M0 0h24v24H0z" fill="none" />
+            <path d="M20.926 7.074a3.67 3.67 0 0 1 1.074 2.593v8.666a3.667 3.667 0 0 1 -3.667 3.667h-8.666a3.667 3.667 0 0 1 -3.667 -3.667v-8.666q 0 -.053 .005 -.102a3.66 3.66 0 0 1 3.662 -3.565h8.666c.973 0 1.905 .386 2.593 1.074" />
+            <path d="M17.374 3.514a1 1 0 1 1 -1.748 .972c-.221 -.398 -.342 -.486 -.626 -.486h-10c-.548 0 -1 .452 -1 1v9.998c0 .36 .194 .692 .507 .87a1 1 0 1 1 -.99 1.738a3 3 0 0 1 -1.517 -2.606v-10c0 -1.652 1.348 -3 3 -3h10c1.094 0 1.828 .533 2.374 1.514" />
+          </svg>
+        </span>
+        <span>Paste</span>
+      </button>
+
+      <button class="edit-menu-item" onclick="deleteSelectedItems();closeEditMenu()">
+        <span class="edit-menu-icon">
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.1" stroke-linecap="round" stroke-linejoin="round">
+            <path stroke="none" d="M0 0h24v24H0z" fill="none" />
+            <path d="M4 7l16 0" />
+            <path d="M10 11l0 6" />
+            <path d="M14 11l0 6" />
+            <path d="M5 7l1 12a2 2 0 0 0 2 2h8a2 2 0 0 0 2 -2l1 -12" />
+            <path d="M9 7v-3a1 1 0 0 1 1 -1h4a1 1 0 0 1 1 1v3" />
+          </svg>
+        </span>
+        <span>Delete</span>
+      </button>
+
+      <div class="export-divider"></div>
+
+      <button class="edit-menu-item" onclick="selectAllCanvasItems();closeEditMenu()">
+        <span class="edit-menu-icon">
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.1" stroke-linecap="round" stroke-linejoin="round">
+            <path stroke="none" d="M0 0h24v24H0z" fill="none" />
+            <path d="M8 9a1 1 0 0 1 1 -1h6a1 1 0 0 1 1 1v6a1 1 0 0 1 -1 1h-6a1 1 0 0 1 -1 -1l0 -6" />
+            <path d="M12 20v.01" />
+            <path d="M16 20v.01" />
+            <path d="M8 20v.01" />
+            <path d="M4 20v.01" />
+            <path d="M4 16v.01" />
+            <path d="M4 12v.01" />
+            <path d="M4 8v.01" />
+            <path d="M4 4v.01" />
+            <path d="M8 4v.01" />
+            <path d="M12 4v.01" />
+            <path d="M16 4v.01" />
+            <path d="M20 4v.01" />
+            <path d="M20 8v.01" />
+            <path d="M20 12v.01" />
+            <path d="M20 16v.01" />
+            <path d="M20 20v.01" />
+          </svg>
+        </span>
+        <span>Select All</span>
+      </button>
+    </div>
+
+    <div id="main">
+      <aside id="sidebar">
+        <div class="section">
+          <div class="section-title">Add Device</div>
+
+          <label>Name</label>
+          <input id="deviceName" class="input" placeholder="ex. US-M-SIEM01"/>
+
+          <label>Subtitle</label>
+          <input id="deviceSub" class="input" placeholder="ex. Wazuh Manager · 10.20.20.40"/>
+
+          <div class="row">
+            <div>
+              <label>Type</label>
+              <select id="deviceType" class="select" onchange="updateDevicePortCountDefault()">
+                <option value="firewall">Firewall</option>
+                <option value="router">Router / Gateway</option>
+                <option value="switch">Switch</option>
+                <option value="server">Server</option>
+                <option value="vm">Virtual Machine</option>
+                <option value="pc">Workstation</option>
+                <option value="ap">Access Point</option>
+                <option value="wifi">WiFi / SSID</option>
+                <option value="cloud">WAN / Cloud</option>
+                <option value="database">Database / NAS</option>
+                <option value="other">Other</option>
+              </select>
+            </div>
+
+            <div>
+              <label>Status</label>
+              <select id="deviceStatus" class="select">
+                <option value="online">Online</option>
+                <option value="warning">Warning</option>
+                <option value="down">Down</option>
+              </select>
+            </div>
+          </div>
+
+          <label>Port Count</label>
+          <input id="devicePortCount" class="input" type="number" min="1" max="96" step="1" value="4"/>
+
+          <div class="row">
+            <div>
+              <label>Left Icon</label>
+              <select id="deviceIconLeft" class="select">
+                <option value="auto">Auto</option>
+                <option value="wall">Firewall Wall</option>
+                <option value="shield-lock">Shield Lock</option>
+                <option value="network">Router / Gateway</option>
+                <option value="switch-horizontal">Switch</option>
+                <option value="cloud">Cloud</option>
+                <option value="server">Server</option>
+                <option value="devices-2">PC / Devices</option>
+                <option value="desktop">Desktop / VM</option>
+                <option value="wifi">WiFi</option>
+                <option value="antenna-bars-5">Access Point</option>
+                <option value="database">Database / NAS</option>
+              </select>
+            </div>
+
+            <div>
+              <label>Right Icon</label>
+              <select id="deviceIconRight" class="select">
+                <option value="">None</option>
+                <option value="wall">Firewall Wall</option>
+                <option value="shield-lock">Shield Lock</option>
+                <option value="network">Router / Gateway</option>
+                <option value="switch-horizontal">Switch</option>
+                <option value="cloud">Cloud</option>
+                <option value="server">Server</option>
+                <option value="devices-2">PC / Devices</option>
+                <option value="desktop">Desktop / VM</option>
+                <option value="wifi">WiFi</option>
+                <option value="antenna-bars-5">Access Point</option>
+                <option value="database">Database / NAS</option>
+              </select>
+            </div>
+          </div>
+
+          <label>Color</label>
+          <div class="color-row">
+            <input id="deviceColor" type="color" value="#3b9eff"/>
+            <button class="btn" onclick="setDeviceColor('#3b9eff')">Blue</button>
+            <button class="btn" onclick="setDeviceColor('#39d353')">Green</button>
+            <button class="btn" onclick="setDeviceColor('#ff9f43')">Orange</button>
+          </div>
+
+          <button class="add-btn" onclick="addDevice()">+ Add Device</button>
+        </div>
+
+        <div class="divider"></div>
+
+        <div class="section">
+          <div class="section-title">Animation</div>
+          <label>Bubble Speed</label>
+          <div class="range-row">
+            <input id="packetSpeedInput" type="range" min=".15" max="2" step=".05" value=".55" oninput="setPacketSpeed(this.value)"/>
+            <span id="packetSpeedValue" class="range-value">0.55x</span>
+          </div>
+        </div>
+
+        <div class="divider"></div>
+
+        <div class="section">
+          <div class="section-title">Devices (<span id="deviceCount">0</span>)</div>
+        </div>
+        <div id="deviceList" class="item-list"></div>
+
+        <div class="divider"></div>
+
+        <div class="section">
+          <div class="section-title">VLAN Zones (<span id="zoneCount">0</span>)</div>
+          <button class="add-btn" onclick="openZoneModal()">+ Add VLAN Zone</button>
+        </div>
+        <div id="zoneList" class="item-list"></div>
+
+        <div class="divider"></div>
+
+        <div id="properties" class="section" style="display:none">
+          <div id="propTitle" class="section-title">Selected</div>
+
+          <div id="commonProps">
+            <label>Name / Label</label>
+            <input id="propName" class="input" oninput="updateSelected('name',this.value)"/>
+
+            <label>Subtitle / Notes</label>
+            <input id="propSub" class="input" oninput="updateSelected('sub',this.value)"/>
+          </div>
+
+          <div id="deviceOnlyProps">
+            <label>Type</label>
+            <select id="propType" class="select" onchange="updateSelected('type',this.value)">
+              <option value="firewall">Firewall</option>
+              <option value="router">Router / Gateway</option>
+              <option value="switch">Switch</option>
+              <option value="server">Server</option>
+              <option value="vm">Virtual Machine</option>
+              <option value="pc">Workstation</option>
+              <option value="ap">Access Point</option>
+              <option value="wifi">WiFi / SSID</option>
+              <option value="cloud">WAN / Cloud</option>
+              <option value="database">Database / NAS</option>
+              <option value="other">Other</option>
+            </select>
+
+            <label>Port Count</label>
+            <input id="propPortCount" class="input" type="number" min="1" max="96" step="1" onchange="updateSelected('portCount',this.value)"/>
+
+            <div class="row">
+              <div>
+                <label>Left Icon</label>
+                <select id="propIconLeft" class="select" onchange="updateSelected('iconLeft',this.value)">
+                  <option value="auto">Auto</option>
+                  <option value="wall">Firewall Wall</option>
+                  <option value="shield-lock">Shield Lock</option>
+                  <option value="network">Router / Gateway</option>
+                  <option value="switch-horizontal">Switch</option>
+                  <option value="cloud">Cloud</option>
+                  <option value="server">Server</option>
+                  <option value="devices-2">PC / Devices</option>
+                  <option value="desktop">Desktop / VM</option>
+                  <option value="wifi">WiFi</option>
+                  <option value="antenna-bars-5">Access Point</option>
+                  <option value="database">Database / NAS</option>
+                </select>
+              </div>
+
+              <div>
+                <label>Right Icon</label>
+                <select id="propIconRight" class="select" onchange="updateSelected('iconRight',this.value)">
+                  <option value="">None</option>
+                  <option value="wall">Firewall Wall</option>
+                  <option value="shield-lock">Shield Lock</option>
+                  <option value="network">Router / Gateway</option>
+                  <option value="switch-horizontal">Switch</option>
+                  <option value="cloud">Cloud</option>
+                  <option value="server">Server</option>
+                  <option value="devices-2">PC / Devices</option>
+                  <option value="desktop">Desktop / VM</option>
+                  <option value="wifi">WiFi</option>
+                  <option value="antenna-bars-5">Access Point</option>
+                  <option value="database">Database / NAS</option>
+                </select>
+              </div>
+            </div>
+
+            <label>Status</label>
+            <select id="propStatus" class="select" onchange="updateSelected('status',this.value)">
+              <option value="online">Online</option>
+              <option value="warning">Warning</option>
+              <option value="down">Down</option>
+            </select>
+
+            <div class="property-divider"></div>
+
+            <div class="mini-section-title">Manual Network Override</div>
+
+            <label>Manual IP Address</label>
+            <input id="propDeviceIp" class="input" placeholder="ex. 10.20.20.40" oninput="updateSelected('ipAddress',this.value)"/>
+
+            <label>Manual Gateway</label>
+            <input id="propDeviceGateway" class="input" placeholder="ex. 10.20.20.1" oninput="updateSelected('gatewayOverride',this.value)"/>
+
+            <label>Manual DNS</label>
+            <input id="propDeviceDns" class="input" placeholder="ex. 10.20.20.10, 10.20.20.20" oninput="updateSelected('dnsOverride',this.value)"/>
+
+            <button class="secondary-btn" onclick="resetSelectedDeviceNetworkOverride()">
+              Reset to Inherited Network
+            </button>
+
+            <div class="property-divider"></div>
+
+            <div class="mini-section-title">Device Appearance</div>
+
+            <label>Rotation</label>
+            <div class="row">
+              <button class="secondary-btn" onclick="rotateSelectedDevice(-1)">Rotate Left</button>
+              <button class="secondary-btn" onclick="rotateSelectedDevice(1)">Rotate Right</button>
+            </div>
+          </div>
+
+          <div id="zoneOnlyProps" style="display:none">
+            <div class="property-divider"></div>
+
+            <div class="mini-section-title">Network Profile</div>
+
+            <label>VLAN ID</label>
+            <input id="propZoneVlanId" class="input" placeholder="ex. 20" oninput="updateSelected('vlanId',this.value)"/>
+
+            <label>Subnet</label>
+            <input id="propZoneSubnet" class="input" placeholder="ex. 10.20.20.0/26" oninput="updateSelected('subnet',this.value)"/>
+
+            <label>Gateway</label>
+            <input id="propZoneGateway" class="input" placeholder="ex. 10.20.20.1" oninput="updateSelected('gateway',this.value)"/>
+
+            <label>DNS</label>
+            <input id="propZoneDns" class="input" placeholder="ex. 10.20.20.10, 10.20.20.20" oninput="updateSelected('dns',this.value)"/>
+
+            <label>DHCP</label>
+            <select id="propZoneDhcp" class="select" onchange="updateSelected('dhcp',this.value)">
+              <option value="true">Enabled</option>
+              <option value="false">Disabled</option>
+            </select>
+
+            <div class="property-divider"></div>
+
+            <div class="mini-section-title">Zone Appearance</div>
+
+            <label>Border Style</label>
+            <select id="propZoneBorderStyle" class="select" onchange="updateSelected('borderStyle',this.value)">
+              <option value="dashed">Dashed</option>
+              <option value="solid">Solid</option>
+              <option value="dotted">Dotted</option>
+            </select>
+
+            <label>Border Width</label>
+            <div class="range-row">
+              <input id="propZoneBorderWidth" type="range" min="1" max="5" step=".25" value="1.5" oninput="updateSelected('borderWidth',this.value)"/>
+              <span id="zoneBorderWidthValue" class="range-value">1.50</span>
+            </div>
+
+            <label>Zone Opacity</label>
+            <div class="range-row">
+              <input id="propZoneOpacity" type="range" min=".02" max=".25" step=".01" value=".06" oninput="updateSelected('opacity',this.value)"/>
+              <span id="zoneOpacityValue" class="range-value">0.06</span>
+            </div>
+          </div>
+
+          <div id="connectionOnlyProps" style="display:none">
+            <label>Line Anchor Points</label>
+            <div class="row">
+              <div>
+                <label>From Side</label>
+                <select id="propConnFromSide" class="select" onchange="updateSelected('fromSide',this.value)">
+                  <option value="auto">Auto</option>
+                  <option value="top">Top</option>
+                  <option value="right">Right</option>
+                  <option value="bottom">Bottom</option>
+                  <option value="left">Left</option>
+                  <option value="center">Center</option>
+                </select>
+              </div>
+
+              <div>
+                <label>To Side</label>
+                <select id="propConnToSide" class="select" onchange="updateSelected('toSide',this.value)">
+                  <option value="auto">Auto</option>
+                  <option value="top">Top</option>
+                  <option value="right">Right</option>
+                  <option value="bottom">Bottom</option>
+                  <option value="left">Left</option>
+                  <option value="center">Center</option>
+                </select>
+              </div>
+            </div>
+
+            <button class="secondary-btn" onclick="clearSelectedConnectionBends()">Clear Reshape Points</button>
+
+            <label>From Device</label>
+            <select id="propConnFrom" class="select" onchange="updateSelected('from',this.value)"></select>
+
+            <label>From Port</label>
+            <select id="propConnFromPort" class="select" onchange="updateSelected('fromPort',this.value)"></select>
+
+            <label>To Device</label>
+            <select id="propConnTo" class="select" onchange="updateSelected('to',this.value)"></select>
+
+            <label>To Port</label>
+            <select id="propConnToPort" class="select" onchange="updateSelected('toPort',this.value)"></select>
+
+            <label>Line Style</label>
+            <select id="propConnStyle" class="select" onchange="updateSelected('style',this.value)">
+              <option value="solid">Solid / Wired</option>
+              <option value="dashed">Dashed / Wireless</option>
+            </select>
+
+            <label>Status</label>
+            <select id="propConnStatus" class="select" onchange="updateSelected('status',this.value)">
+              <option value="online">Online</option>
+              <option value="warning">Warning</option>
+              <option value="down">Down</option>
+              <option value="blocked">Blocked</option>
+            </select>
+
+            <button class="reset-btn" onclick="deleteSelectedConnection()">Delete Connection</button>
+          </div>
+        </div>
+      </aside>
+
+      <main id="canvasWrap">
+        <canvas id="canvas"></canvas>
+
+        <div id="floatingCanvasControls">
+          <button class="floating-control-btn" onclick="undo()" title="Undo" aria-label="Undo">
+            ↶
+          </button>
+
+          <button class="floating-control-btn" onclick="redo()" title="Redo" aria-label="Redo">
+            ↷
+          </button>
+
+          <div class="floating-zoom-pill">
+            <button onclick="zoomView(.88)" aria-label="Zoom out">−</button>
+            <span id="zoomText" ondblclick="fitView()" title="Double-click to fit diagram">100%</span>
+            <button onclick="zoomView(1.14)" aria-label="Zoom in">+</button>
+          </div>
+        </div>
+      </main>
+
+      <aside id="detailsPanel">
+        <div id="detailsPanelContent">
+          <div class="details-empty">
+            <div class="details-empty-icon">⌁</div>
+            <div class="details-empty-title">No device selected</div>
+            <div class="details-empty-sub">Select a device to view ports, connections, and details.</div>
+          </div>
+        </div>
+      </aside>
+    </div>
+  </div>
+
+  <div id="connectionModal" class="modal-bg">
+    <div class="modal">
+      <h3>Add Connection</h3>
+
+      <label>From Device</label>
+      <select id="connFrom" class="select" onchange="refreshConnectionModalPorts()"></select>
+
+      <label>From Port</label>
+      <select id="connFromPort" class="select" onchange="updateConnectionAddButtonState()"></select>
+
+      <label>To Device</label>
+      <select id="connTo" class="select" onchange="refreshConnectionModalPorts()"></select>
+
+      <label>To Port</label>
+      <select id="connToPort" class="select" onchange="updateConnectionAddButtonState()"></select>
+
+      <div id="connectionValidationMessage" class="connection-validation-message">
+        Ready to add connection
+      </div>
+
+      <div class="row">
+        <div>
+          <label>Style</label>
+          <select id="connStyle" class="select" onchange="updateConnectionAddButtonState()">
+            <option value="solid">Solid / Wired</option>
+            <option value="dashed">Dashed / Wireless</option>
+          </select>
+        </div>
+
+        <div>
+          <label>Status</label>
+          <select id="connStatus" class="select" onchange="updateConnectionAddButtonState()">
+            <option value="online">Online</option>
+            <option value="warning">Warning</option>
+            <option value="down">Down</option>
+            <option value="blocked">Blocked</option>
+          </select>
+        </div>
+      </div>
+
+      <div class="modal-actions">
+        <button class="btn" onclick="closeModal('connectionModal')">Cancel</button>
+        <button id="addConnectionBtn" class="btn primary" onclick="addConnection()">Add</button>
+      </div>
+    </div>
+  </div>
+
+  <div id="zoneModal" class="modal-bg">
+    <div class="modal">
+      <div class="modal-title-row">
+        <h3>Add VLAN Zone</h3>
+        <input id="zoneColor" type="color" class="modal-color-square" value="#7a8899"/>
+      </div>
+
+      <label>Zone Name</label>
+      <input id="zoneName" class="input" placeholder="ex. Management VLAN"/>
+
+      <label>Border Style</label>
+      <select id="zoneBorderStyle" class="select">
+        <option value="dashed">Dashed</option>
+        <option value="solid">Solid</option>
+        <option value="dotted">Dotted</option>
+      </select>
+
+      <div class="mini-section-title">Network Profile</div>
+
+      <label>VLAN ID</label>
+      <input id="zoneVlanId" class="input" placeholder="ex. 20"/>
+
+      <label>Subnet</label>
+      <input id="zoneSubnet" class="input" placeholder="ex. 10.20.20.0/26"/>
+
+      <label>Gateway</label>
+      <input id="zoneGateway" class="input" placeholder="ex. 10.20.20.1"/>
+
+      <label>DNS</label>
+      <input id="zoneDns" class="input" placeholder="ex. 10.20.20.10, 10.20.20.20"/>
+
+      <label>DHCP</label>
+      <select id="zoneDhcp" class="select">
+        <option value="true">Enabled</option>
+        <option value="false">Disabled</option>
+      </select>
+
+      <div class="modal-actions">
+        <button class="btn" onclick="closeModal('zoneModal')">Cancel</button>
+        <button class="btn primary" onclick="addZone()">Add Zone</button>
+      </div>
+    </div>
+  </div>
+
+  <div id="jsonModal" class="modal-bg">
+    <div class="modal">
+      <h3>Export / Import JSON</h3>
+      <p class="help">
+        Use this to copy your topology, back it up, or move it to another computer.
+        To import, paste JSON here and click Import.
+      </p>
+
+      <textarea id="jsonBox" class="textarea"></textarea>
+
+      <div class="modal-actions">
+        <button class="btn" onclick="copyJson()">Copy</button>
+        <button class="btn" onclick="importJson()">Import</button>
+        <button class="btn" onclick="closeModal('jsonModal')">Close</button>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    function toggleEditMenu() {
+      const menu = document.getElementById('editMenu');
+
+      if (!menu) return;
+
+      const isOpen = menu.classList.contains('open');
+
+      closeEditMenu();
+
+      if (!isOpen) {
+        menu.classList.add('open');
+      }
+    }
+
+    function closeEditMenu() {
+      const menu = document.getElementById('editMenu');
+
+      if (menu) {
+        menu.classList.remove('open');
+      }
+    }
+
+    function updateConnectionActionButtons() {
+      const addBtn = document.getElementById('addConnectionActionBtn');
+      const removeBtn = document.getElementById('removeConnectionActionBtn');
+
+      if (!addBtn || !removeBtn || typeof state === 'undefined') return;
+
+      const deviceSelected = state.selectedType === 'device';
+      const connectionSelected = state.selectedType === 'connection';
+
+      addBtn.classList.toggle('enabled', deviceSelected);
+      addBtn.classList.toggle('disabled', !deviceSelected);
+
+      removeBtn.classList.toggle('enabled', connectionSelected);
+      removeBtn.classList.toggle('disabled', !connectionSelected);
+
+      addBtn.title = deviceSelected
+        ? 'Add a connection from the selected device'
+        : 'Select a device to add a connection';
+
+      removeBtn.title = connectionSelected
+        ? 'Remove selected connection'
+        : 'Select a connection line to remove it';
+    }
+
+    function handleConnectionAddButton() {
+      if (typeof state === 'undefined' || state.selectedType !== 'device') {
+        setStatus('Select a device first to add a connection');
+        updateConnectionActionButtons();
+        return;
+      }
+
+      openConnectionModal();
+    }
+
+    function handleConnectionRemoveButton() {
+      if (typeof state === 'undefined' || state.selectedType !== 'connection') {
+        setStatus('Select a connection line first to remove it');
+        updateConnectionActionButtons();
+        return;
+      }
+
+      deleteSelectedConnection();
+      updateConnectionActionButtons();
+    }
+
+    document.addEventListener('click', function(event) {
+      const editMenu = document.getElementById('editMenu');
+      const editBtn = document.getElementById('editBtn');
+
+      if (editMenu && editBtn) {
+        if (
+          !editMenu.contains(event.target) &&
+          !editBtn.contains(event.target)
+        ) {
+          editMenu.classList.remove('open');
+        }
+      }
+
+      setTimeout(updateConnectionActionButtons, 0);
+    });
+
+    document.addEventListener('keyup', function() {
+      updateConnectionActionButtons();
+    });
+
+    window.addEventListener('load', function() {
+      updateConnectionActionButtons();
+      setInterval(updateConnectionActionButtons, 150);
+    });
+  </script>
+
+  <script src="https://cdn.jsdelivr.net/npm/gif.js@0.2.0/dist/gif.js"></script>
+
+  <script src="./js/config.js"></script>
+  <script src="./js/state.js"></script>
+  <script src="./js/app.js"></script>
+  <script src="./js/history.js"></script>
+  <script src="./js/modals.js"></script>
+  <script src="./js/zones.js"></script>
+  <script src="./js/devices.js"></script>
+  <script src="./js/connections.js"></script>
+  <script src="./js/sidebar.js"></script>
+  <script src="./js/storage.js"></script>
+  <script src="./js/icons.js"></script>
+  <script src="./js/canvas.js"></script>
+  <script src="./js/export.js"></script>
+  <script src="./js/main.js"></script>
+</body>
+</html>

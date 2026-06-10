@@ -2218,6 +2218,68 @@ function resetSelectedDeviceNetworkOverride() {
 
   setStatus('Manual network override reset for ' + device.name);
 }
+function startPacketAnimation() {
+  state.animationMode = 'running';
+
+  updateUiState();
+
+  if (typeof drawScene === 'function') {
+    drawScene(performance.now());
+  }
+
+  setStatus('Animation started');
+}
+
+function pausePacketAnimation() {
+  state.animationMode = 'paused';
+
+  updateUiState();
+
+  if (typeof drawScene === 'function') {
+    drawScene(performance.now());
+  }
+
+  setStatus('Animation paused');
+}
+
+function stopPacketAnimation() {
+  state.animationMode = 'stopped';
+
+  updateUiState();
+
+  if (typeof drawScene === 'function') {
+    drawScene(performance.now());
+  }
+
+  setStatus('Animation stopped');
+}
+
+function updateAnimationButtons() {
+  const startBtn = document.getElementById('animationStartBtn');
+  const pauseBtn = document.getElementById('animationPauseBtn');
+  const stopBtn = document.getElementById('animationStopBtn');
+
+  if (!startBtn || !pauseBtn || !stopBtn) return;
+
+  const mode = state.animationMode || 'running';
+
+  const isRunning = mode === 'running';
+  const isPaused = mode === 'paused';
+  const isStopped = mode === 'stopped';
+
+  startBtn.classList.toggle('is-active', !isRunning);
+  startBtn.classList.toggle('is-disabled', isRunning);
+  startBtn.disabled = isRunning;
+
+  pauseBtn.classList.toggle('is-active', isRunning);
+  pauseBtn.classList.toggle('is-disabled', !isRunning);
+  pauseBtn.disabled = !isRunning;
+
+  stopBtn.classList.toggle('is-active', !isStopped);
+  stopBtn.classList.toggle('is-disabled', isStopped);
+  stopBtn.disabled = isStopped;
+}
+
 function setFontSize(value) {
   state.fontSize = Number(value);
 
@@ -2283,6 +2345,10 @@ function updateUiState() {
     so this function no longer references portToggleBtn.
   */
 
+  if (!state.animationMode) {
+    state.animationMode = 'running';
+  }
+
   packetSpeedInput.value = state.packetSpeed;
   packetSpeedValue.textContent = state.packetSpeed.toFixed(2) + 'x';
 
@@ -2295,6 +2361,7 @@ function updateUiState() {
   document.body.classList.toggle('sidebar-hidden', Boolean(state.sidebarHidden));
   menuToggleBtn.setAttribute('aria-label', state.sidebarHidden ? 'Show menu' : 'Hide menu');
 
+  updateAnimationButtons();
   updateZoomText();
 
   if (typeof resizeCanvas === 'function') {

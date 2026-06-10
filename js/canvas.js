@@ -9,6 +9,9 @@ let zoneMoveSnapshot = null;
 let smartSnapActive = false;
 let smartSnapType = "";
 
+let packetAnimationClock = 0;
+let packetAnimationLastTimestamp = null;
+
 let selectionDragging = false;
 let selectionAddMode = false;
 let selectionStartX = 0;
@@ -1928,6 +1931,38 @@ function drawConnection(connection, index, timestamp) {
    PACKET ANIMATION
 ========================= */
 
+function getPacketAnimationTimestamp(timestamp = 0) {
+  if (!state.animationMode) {
+    state.animationMode = "running";
+  }
+
+  if (state.animationMode === "stopped") {
+    packetAnimationLastTimestamp = null;
+    return null;
+  }
+
+  if (state.animationMode === "paused") {
+    packetAnimationLastTimestamp = timestamp;
+    return packetAnimationClock;
+  }
+
+  if (packetAnimationLastTimestamp === null) {
+    packetAnimationLastTimestamp = timestamp;
+  }
+
+  const delta = Math.max(0, timestamp - packetAnimationLastTimestamp);
+
+  packetAnimationClock += delta;
+  packetAnimationLastTimestamp = timestamp;
+
+  return packetAnimationClock;
+}
+
+function resetPacketAnimationClock() {
+  packetAnimationClock = 0;
+  packetAnimationLastTimestamp = null;
+}
+
 function findWanDevice() {
   return state.devices.find(device => {
     const name = device.name.toLowerCase();
@@ -2096,6 +2131,10 @@ function pointAlongSegments(segments, t) {
 }
 
 function drawNetworkPackets(timestamp = 0) {
+  const packetTimestamp = getPacketAnimationTimestamp(timestamp);
+
+  if (packetTimestamp === null) return;
+
   const wanDevice = findWanDevice();
 
   if (!wanDevice) return;
@@ -2114,7 +2153,7 @@ function drawNetworkPackets(timestamp = 0) {
 
     const baseSpeed = 9000;
     const speed = baseSpeed / Math.max(state.packetSpeed || 0.55, 0.05);
-    const raw = ((timestamp + index * 950) % speed) / speed;
+    const raw = ((packetTimestamp + index * 950) % speed) / speed;
 
     const t = raw < 0.5 ? raw * 2 : 2 - raw * 2;
 
@@ -2147,7 +2186,6 @@ function drawNetworkPackets(timestamp = 0) {
     ctx.restore();
   });
 }
-
 /* =========================
    ZONES / DEVICES
 ========================= */

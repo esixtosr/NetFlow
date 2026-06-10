@@ -330,12 +330,61 @@
 
         <div class="divider"></div>
 
-        <div class="section">
+        <div class="section animation-section">
           <div class="section-title">Animation</div>
+
           <label>Bubble Speed</label>
           <div class="range-row">
-            <input id="packetSpeedInput" type="range" min=".15" max="2" step=".05" value=".55" oninput="setPacketSpeed(this.value)"/>
+            <input id="packetSpeedInput" class="teal-range" type="range" min=".15" max="2" step=".05" value=".55" oninput="setPacketSpeed(this.value)"/>
             <span id="packetSpeedValue" class="range-value">0.55x</span>
+          </div>
+
+          <div class="animation-controls">
+            <button
+              id="animationStartBtn"
+              class="animation-control-btn start"
+              onclick="startPacketAnimation()"
+              type="button"
+              title="Start bubbles"
+              aria-label="Start bubbles"
+            >
+              <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor">
+                <path stroke="none" d="M0 0h24v24H0z" fill="none" />
+                <path d="M6 4v16a1 1 0 0 0 1.524 .852l13 -8a1 1 0 0 0 0 -1.704l-13 -8a1 1 0 0 0 -1.524 .852z" />
+              </svg>
+              <span>Start</span>
+            </button>
+
+            <button
+              id="animationPauseBtn"
+              class="animation-control-btn pause"
+              onclick="pausePacketAnimation()"
+              type="button"
+              title="Pause bubbles"
+              aria-label="Pause bubbles"
+            >
+              <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor">
+                <path stroke="none" d="M0 0h24v24H0z" fill="none" />
+                <path d="M9 4h-2a2 2 0 0 0 -2 2v12a2 2 0 0 0 2 2h2a2 2 0 0 0 2 -2v-12a2 2 0 0 0 -2 -2z" />
+                <path d="M17 4h-2a2 2 0 0 0 -2 2v12a2 2 0 0 0 2 2h2a2 2 0 0 0 2 -2v-12a2 2 0 0 0 -2 -2z" />
+              </svg>
+              <span>Pause</span>
+            </button>
+
+            <button
+              id="animationStopBtn"
+              class="animation-control-btn stop"
+              onclick="stopPacketAnimation()"
+              type="button"
+              title="Stop and hide bubbles"
+              aria-label="Stop and hide bubbles"
+            >
+              <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor">
+                <path stroke="none" d="M0 0h24v24H0z" fill="none" />
+                <path d="M17 4h-10a3 3 0 0 0 -3 3v10a3 3 0 0 0 3 3h10a3 3 0 0 0 3 -3v-10a3 3 0 0 0 -3 -3z" />
+              </svg>
+              <span>Stop</span>
+            </button>
           </div>
         </div>
 

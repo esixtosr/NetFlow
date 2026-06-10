@@ -3050,3 +3050,132 @@ button:disabled {
   height: 28px;
   display: block;
 }
+
+.animation-section .range-row {
+  margin-bottom: 12px;
+}
+
+.teal-range {
+  accent-color: #64ffda;
+}
+
+.teal-range::-webkit-slider-runnable-track {
+  height: 6px;
+  border-radius: 999px;
+  background: linear-gradient(
+    90deg,
+    rgba(100, 255, 218, 0.85),
+    rgba(59, 158, 255, 0.35)
+  );
+}
+
+.teal-range::-webkit-slider-thumb {
+  -webkit-appearance: none;
+  appearance: none;
+  width: 17px;
+  height: 17px;
+  margin-top: -5.5px;
+  border-radius: 50%;
+  background: #64ffda;
+  border: 2px solid #020c1b;
+  box-shadow:
+    0 0 0 3px rgba(100, 255, 218, 0.18),
+    0 0 14px rgba(100, 255, 218, 0.45);
+  cursor: pointer;
+}
+
+.teal-range::-moz-range-track {
+  height: 6px;
+  border-radius: 999px;
+  background: linear-gradient(
+    90deg,
+    rgba(100, 255, 218, 0.85),
+    rgba(59, 158, 255, 0.35)
+  );
+}
+
+.teal-range::-moz-range-thumb {
+  width: 17px;
+  height: 17px;
+  border-radius: 50%;
+  background: #64ffda;
+  border: 2px solid #020c1b;
+  box-shadow:
+    0 0 0 3px rgba(100, 255, 218, 0.18),
+    0 0 14px rgba(100, 255, 218, 0.45);
+  cursor: pointer;
+}
+
+.animation-controls {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 8px;
+  margin-top: 12px;
+}
+
+.animation-control-btn {
+  height: 38px;
+  border-radius: 12px;
+  border: 1px solid rgba(148, 163, 184, 0.22);
+  background: rgba(15, 23, 42, 0.58);
+  color: #9ba8c5;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  font: 800 11px "Inter", sans-serif;
+  cursor: pointer;
+  transition:
+    background 160ms ease,
+    border-color 160ms ease,
+    color 160ms ease,
+    opacity 160ms ease,
+    transform 160ms ease,
+    box-shadow 160ms ease;
+}
+
+.animation-control-btn svg {
+  width: 16px;
+  height: 16px;
+  flex: 0 0 auto;
+}
+
+.animation-control-btn.is-active {
+  color: #64ffda;
+  border-color: rgba(100, 255, 218, 0.42);
+  background: rgba(100, 255, 218, 0.08);
+  box-shadow: 0 0 16px rgba(100, 255, 218, 0.12);
+}
+
+.animation-control-btn.is-active:hover {
+  transform: translateY(-1px);
+  border-color: rgba(100, 255, 218, 0.68);
+  background: rgba(100, 255, 218, 0.12);
+  box-shadow: 0 0 20px rgba(100, 255, 218, 0.2);
+}
+
+.animation-control-btn.is-disabled {
+  opacity: 0.38;
+  cursor: not-allowed;
+  color: #64748b;
+  border-color: rgba(148, 163, 184, 0.12);
+  background: rgba(15, 23, 42, 0.25);
+  box-shadow: none;
+}
+
+.animation-control-btn.is-disabled:hover {
+  transform: none;
+}
+
+.animation-control-btn.stop.is-active {
+  color: #ff6b7a;
+  border-color: rgba(255, 107, 122, 0.42);
+  background: rgba(255, 107, 122, 0.08);
+  box-shadow: 0 0 16px rgba(255, 107, 122, 0.12);
+}
+
+.animation-control-btn.stop.is-active:hover {
+  border-color: rgba(255, 107, 122, 0.68);
+  background: rgba(255, 107, 122, 0.12);
+  box-shadow: 0 0 20px rgba(255, 107, 122, 0.2);
+}

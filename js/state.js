@@ -30,7 +30,15 @@ let state = {
   */
   showPorts: false,
 
+  /*
+    Animation controls:
+    running = packets/bubbles move
+    paused  = packets/bubbles freeze in place
+    stopped = packets/bubbles are hidden
+  */
   packetSpeed: 0.55,
+  animationMode: 'running',
+
   fontSize: 16,
   boxScale: 1,
   sidebarHidden: false
@@ -80,7 +88,15 @@ function resetState() {
     */
     showPorts: false,
 
+    /*
+      Animation controls:
+      running = packets/bubbles move
+      paused  = packets/bubbles freeze in place
+      stopped = packets/bubbles are hidden
+    */
     packetSpeed: 0.55,
+    animationMode: 'running',
+
     fontSize: 16,
     boxScale: 1,
     sidebarHidden: false

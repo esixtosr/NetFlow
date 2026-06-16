@@ -31,9 +31,32 @@ let state = {
   showPorts: false,
 
   packetSpeed: 0.55,
+
+  /*
+    Animation state:
+    stopped = bubbles hidden
+    running = bubbles moving
+    paused = bubbles frozen
+  */
+  animationMode: 'stopped',
+
   fontSize: 16,
   boxScale: 1,
-  sidebarHidden: false
+  sidebarHidden: false,
+
+  /*
+    Phase A:
+    Sidebar collapsible section state.
+    These control the main sidebar groups:
+    1. Smart Inspector / Builder
+    2. Animation
+    3. Devices
+    4. VLAN Zones
+  */
+  inspectorOpen: true,
+  animationOpen: true,
+  devicesOpen: true,
+  vlanZonesOpen: true
 };
 
 function uid(prefix) {
@@ -81,9 +104,25 @@ function resetState() {
     showPorts: false,
 
     packetSpeed: 0.55,
+
+    /*
+      Animation state:
+      Start clean with bubbles hidden.
+    */
+    animationMode: 'stopped',
+
     fontSize: 16,
     boxScale: 1,
-    sidebarHidden: false
+    sidebarHidden: false,
+
+    /*
+      Phase A:
+      Reset sidebar collapsible sections.
+    */
+    inspectorOpen: true,
+    animationOpen: true,
+    devicesOpen: true,
+    vlanZonesOpen: true
   };
 }
 

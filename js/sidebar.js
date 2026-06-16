@@ -40,6 +40,185 @@ const sidebarCategoryExpanded = {
   other: false
 };
 
+let sidebarInspectorSnapshot = null;
+let sidebarInspectorDirty = false;
+
+function cloneForInspectorSnapshot(item) {
+  if (!item) return null;
+
+  return JSON.parse(JSON.stringify(item));
+}
+
+function getSelectedInspectorItem() {
+  if (state.selectedType === 'device') {
+    return state.devices.find(device => Number(device.id) === Number(state.selectedId)) || null;
+  }
+
+  if (state.selectedType === 'zone') {
+    return state.zones.find(zone => Number(zone.id) === Number(state.selectedId)) || null;
+  }
+
+  if (state.selectedType === 'connection') {
+    return state.connections.find(connection => Number(connection.id) === Number(state.selectedId)) || null;
+  }
+
+  return null;
+}
+
+function captureInspectorSnapshot() {
+  sidebarInspectorSnapshot = cloneForInspectorSnapshot(getSelectedInspectorItem());
+  sidebarInspectorDirty = false;
+  updateInspectorActionButtons();
+}
+
+function markInspectorDirty() {
+  sidebarInspectorDirty = true;
+  updateInspectorActionButtons();
+}
+
+function setInspectorButtonState(button, enabled) {
+  if (!button) return;
+
+  button.disabled = !enabled;
+  button.classList.toggle('disabled', !enabled);
+  button.classList.toggle('enabled', enabled);
+}
+
+function updateInspectorActionButtons() {
+  const deviceSaveBtn = document.getElementById('selectedDeviceSaveBtn');
+  const deviceResetBtn = document.getElementById('selectedDeviceResetBtn');
+
+  const zoneSaveBtn = document.getElementById('selectedZoneSaveBtn');
+  const zoneResetBtn = document.getElementById('selectedZoneResetBtn');
+
+  const connectionSaveBtn = document.getElementById('selectedConnectionSaveBtn');
+  const connectionResetBtn = document.getElementById('selectedConnectionResetBtn');
+
+  const saveEnabled = Boolean(sidebarInspectorDirty && sidebarInspectorSnapshot);
+  const resetEnabled = Boolean(sidebarInspectorSnapshot && state.selectedType);
+
+  setInspectorButtonState(deviceSaveBtn, saveEnabled && state.selectedType === 'device');
+  setInspectorButtonState(zoneSaveBtn, saveEnabled && state.selectedType === 'zone');
+  setInspectorButtonState(connectionSaveBtn, saveEnabled && state.selectedType === 'connection');
+
+  setInspectorButtonState(deviceResetBtn, resetEnabled && state.selectedType === 'device');
+  setInspectorButtonState(zoneResetBtn, resetEnabled && state.selectedType === 'zone');
+  setInspectorButtonState(connectionResetBtn, resetEnabled && state.selectedType === 'connection');
+}
+
+function showBuilderPanel() {
+  const builderPanel = document.getElementById('builderPanel');
+  const propertiesPanel = document.getElementById('properties');
+
+  if (builderPanel) {
+    builderPanel.style.display = 'block';
+  }
+
+  if (propertiesPanel) {
+    propertiesPanel.style.display = 'none';
+  }
+
+  sidebarInspectorSnapshot = null;
+  sidebarInspectorDirty = false;
+  updateInspectorActionButtons();
+}
+
+function showPropertiesPanel() {
+  const builderPanel = document.getElementById('builderPanel');
+  const propertiesPanel = document.getElementById('properties');
+
+  if (builderPanel) {
+    builderPanel.style.display = 'none';
+  }
+
+  if (propertiesPanel) {
+    propertiesPanel.style.display = 'block';
+  }
+}
+
+function saveSelectedInspectorChanges() {
+  const item = getSelectedInspectorItem();
+
+  if (!item) {
+    setStatus('⚠ Nothing selected to save');
+    return;
+  }
+
+  sidebarInspectorSnapshot = cloneForInspectorSnapshot(item);
+  sidebarInspectorDirty = false;
+
+  updateInspectorActionButtons();
+
+  if (state.selectedType === 'device') {
+    setStatus('Device settings saved');
+  } else if (state.selectedType === 'zone') {
+    setStatus('VLAN settings saved');
+  } else if (state.selectedType === 'connection') {
+    setStatus('Connection settings saved');
+  } else {
+    setStatus('Settings saved');
+  }
+}
+
+function resetSelectedInspectorChanges() {
+  if (!sidebarInspectorSnapshot || !state.selectedType) {
+    setStatus('⚠ Nothing to reset');
+    return;
+  }
+
+  pushHistory();
+
+  if (state.selectedType === 'device') {
+    const index = state.devices.findIndex(device => Number(device.id) === Number(state.selectedId));
+
+    if (index === -1) return;
+
+    state.devices[index] = JSON.parse(JSON.stringify(sidebarInspectorSnapshot));
+
+    if (typeof syncDevicePorts === 'function') {
+      syncDevicePorts(state.devices[index], getSafePortCount(state.devices[index]));
+    }
+
+    sidebarInspectorDirty = false;
+    updateInspectorActionButtons();
+
+    selectItem('device', state.devices[index].id);
+    setStatus('Device settings reset');
+    return;
+  }
+
+  if (state.selectedType === 'zone') {
+    const index = state.zones.findIndex(zone => Number(zone.id) === Number(state.selectedId));
+
+    if (index === -1) return;
+
+    state.zones[index] = JSON.parse(JSON.stringify(sidebarInspectorSnapshot));
+
+    sidebarInspectorDirty = false;
+    updateInspectorActionButtons();
+
+    selectItem('zone', state.zones[index].id);
+    setStatus('VLAN settings reset');
+    return;
+  }
+
+  if (state.selectedType === 'connection') {
+    const index = state.connections.findIndex(connection => Number(connection.id) === Number(state.selectedId));
+
+    if (index === -1) return;
+
+    state.connections[index] = JSON.parse(JSON.stringify(sidebarInspectorSnapshot));
+    state.highlightedConnectionId = state.connections[index].id;
+    state.highlightedPortKey = null;
+
+    sidebarInspectorDirty = false;
+    updateInspectorActionButtons();
+
+    selectItem('connection', state.connections[index].id);
+    setStatus('Connection settings reset');
+  }
+}
+
 function mountSelectedColorPicker(value) {
   const input = document.createElement('input');
 
@@ -1708,6 +1887,14 @@ function renderZoneItem(zone) {
 function refreshSidebar() {
   sidebarEnsureSelectionState();
 
+  if (!state.selectedType && (!Array.isArray(state.selectedItems) || !state.selectedItems.length)) {
+    showBuilderPanel();
+  } else {
+    showPropertiesPanel();
+  }
+
+  updateInspectorActionButtons();
+
   deviceCount.textContent = state.devices.length;
   zoneCount.textContent = state.zones.length;
 
@@ -1787,6 +1974,8 @@ function selectItem(type, id) {
 
   state.selectedType = type;
   state.selectedId = id;
+
+  showPropertiesPanel();
 
   commonProps.style.display = 'block';
   deviceOnlyProps.style.display = 'none';
@@ -1931,6 +2120,7 @@ function selectItem(type, id) {
     );
   }
 
+  captureInspectorSnapshot();
   refreshSidebar();
 }
 
@@ -1942,7 +2132,7 @@ function clearSelection() {
 
   sidebarClearMultiSelection();
 
-  properties.style.display = 'none';
+  showBuilderPanel();
 
   renderDetailsEmpty();
   refreshSidebar();
@@ -2152,6 +2342,7 @@ function updateSelected(field, value) {
     }
   }
 
+  markInspectorDirty();
   refreshSidebar();
 }
 
@@ -2217,6 +2408,71 @@ function resetSelectedDeviceNetworkOverride() {
   refreshSidebar();
 
   setStatus('Manual network override reset for ' + device.name);
+}
+function startPacketAnimation() {
+  state.animationMode = 'running';
+
+  updateUiState();
+
+  if (typeof drawScene === 'function') {
+    drawScene(performance.now());
+  }
+
+  setStatus('Animation started');
+}
+
+function pausePacketAnimation() {
+  state.animationMode = 'paused';
+
+  updateUiState();
+
+  if (typeof drawScene === 'function') {
+    drawScene(performance.now());
+  }
+
+  setStatus('Animation paused');
+}
+
+function stopPacketAnimation() {
+  state.animationMode = 'stopped';
+
+  if (typeof resetPacketAnimationClock === 'function') {
+    resetPacketAnimationClock();
+  }
+
+  updateUiState();
+
+  if (typeof drawScene === 'function') {
+    drawScene(performance.now());
+  }
+
+  setStatus('Animation stopped');
+}
+
+function updateAnimationButtons() {
+  const startBtn = document.getElementById('animationStartBtn');
+  const pauseBtn = document.getElementById('animationPauseBtn');
+  const stopBtn = document.getElementById('animationStopBtn');
+
+  if (!startBtn || !pauseBtn || !stopBtn) return;
+
+  const mode = state.animationMode || 'running';
+
+  const isRunning = mode === 'running';
+  const isPaused = mode === 'paused';
+  const isStopped = mode === 'stopped';
+
+  startBtn.classList.toggle('is-active', !isRunning);
+  startBtn.classList.toggle('is-disabled', isRunning);
+  startBtn.disabled = isRunning;
+
+  pauseBtn.classList.toggle('is-active', isRunning);
+  pauseBtn.classList.toggle('is-disabled', !isRunning);
+  pauseBtn.disabled = !isRunning;
+
+  stopBtn.classList.toggle('is-active', !isStopped);
+  stopBtn.classList.toggle('is-disabled', isStopped);
+  stopBtn.disabled = isStopped;
 }
 function setFontSize(value) {
   state.fontSize = Number(value);
@@ -2300,6 +2556,14 @@ function updateUiState() {
   if (typeof resizeCanvas === 'function') {
     setTimeout(resizeCanvas, 0);
   }
+  
+  if (typeof applySidebarSectionState === 'function') {
+    applySidebarSectionState();
+  }
+
+  updateAnimationButtons();
+
+  updateInspectorActionButtons();
 }
 
 function updateZoomText() {

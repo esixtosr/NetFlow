@@ -9,6 +9,9 @@ let zoneMoveSnapshot = null;
 let smartSnapActive = false;
 let smartSnapType = "";
 
+let packetAnimationClock = 0;
+let packetAnimationLastTimestamp = null;
+
 let selectionDragging = false;
 let selectionAddMode = false;
 let selectionStartX = 0;
@@ -952,6 +955,19 @@ document.addEventListener("keydown", e => {
     return;
   }
 
+  if (command && e.shiftKey && key === "s") {
+    e.preventDefault();
+
+    if (typeof saveProject === "function") {
+      saveProject();
+      setStatus("Project saved");
+    } else {
+      setStatus("⚠ Save function not found");
+    }
+
+    return;
+  }
+
   if (key === "delete" || key === "backspace") {
     const selected = getActiveSelectableItems();
 
@@ -1075,6 +1091,7 @@ function closestPointOnSegment(px, py, ax, ay, bx, by) {
     distance: Math.hypot(px - x, py - y)
   };
 }
+
 /* =========================
    PHASE 8.3 — SMART LINE SNAP
 ========================= */
@@ -1228,6 +1245,7 @@ function applySmartBendSnap(rawPoint, bendDrag) {
     y: best.y
   };
 }
+
 function hitBendPoint(x, y) {
   for (let i = state.connections.length - 1; i >= 0; i--) {
     const connection = state.connections[i];
@@ -1778,41 +1796,6 @@ function drawGrid() {
   ctx.restore();
 }
 
-function pointAlong(points, t) {
-  let lengths = [];
-  let total = 0;
-
-  for (let i = 0; i < points.length - 1; i++) {
-    const length = Math.hypot(
-      points[i + 1][0] - points[i][0],
-      points[i + 1][1] - points[i][1]
-    );
-
-    lengths.push(length);
-    total += length;
-  }
-
-  if (!total) return points[0];
-
-  let target = total * t;
-  let passed = 0;
-
-  for (let i = 0; i < lengths.length; i++) {
-    if (passed + lengths[i] >= target) {
-      const k = (target - passed) / lengths[i];
-
-      return [
-        points[i][0] + (points[i + 1][0] - points[i][0]) * k,
-        points[i][1] + (points[i + 1][1] - points[i][1]) * k
-      ];
-    }
-
-    passed += lengths[i];
-  }
-
-  return points[points.length - 1];
-}
-
 function drawPolyline(points) {
   ctx.beginPath();
 
@@ -1928,16 +1911,124 @@ function drawConnection(connection, index, timestamp) {
    PACKET ANIMATION
 ========================= */
 
+function getPacketAnimationTimestamp(timestamp = 0) {
+  if (!state.animationMode) {
+    state.animationMode = "running";
+  }
+
+  if (state.animationMode === "stopped") {
+    packetAnimationLastTimestamp = null;
+    return null;
+  }
+
+  if (state.animationMode === "paused") {
+    packetAnimationLastTimestamp = timestamp;
+    return packetAnimationClock;
+  }
+
+  if (packetAnimationLastTimestamp === null) {
+    packetAnimationLastTimestamp = timestamp;
+  }
+
+  const delta = Math.max(0, timestamp - packetAnimationLastTimestamp);
+
+  packetAnimationClock += delta;
+  packetAnimationLastTimestamp = timestamp;
+
+  return packetAnimationClock;
+}
+
+function resetPacketAnimationClock() {
+  packetAnimationClock = 0;
+  packetAnimationLastTimestamp = null;
+}
+
+function updateAnimationButtons() {
+  const startBtn = document.getElementById("animationStartBtn");
+  const pauseBtn = document.getElementById("animationPauseBtn");
+  const stopBtn = document.getElementById("animationStopBtn");
+
+  if (!startBtn || !pauseBtn || !stopBtn) return;
+
+  const mode = state.animationMode || "running";
+
+  const isRunning = mode === "running";
+  const isPaused = mode === "paused";
+  const isStopped = mode === "stopped";
+
+  startBtn.classList.toggle("is-active", !isRunning);
+  startBtn.classList.toggle("is-disabled", isRunning);
+  startBtn.disabled = isRunning;
+
+  pauseBtn.classList.toggle("is-active", isRunning);
+  pauseBtn.classList.toggle("is-disabled", !isRunning);
+  pauseBtn.disabled = !isRunning;
+
+  stopBtn.classList.toggle("is-active", !isStopped);
+  stopBtn.classList.toggle("is-disabled", isStopped);
+  stopBtn.disabled = isStopped;
+
+  if (isPaused) {
+    startBtn.classList.add("is-active");
+    startBtn.classList.remove("is-disabled");
+    startBtn.disabled = false;
+
+    pauseBtn.classList.remove("is-active");
+    pauseBtn.classList.add("is-disabled");
+    pauseBtn.disabled = true;
+
+    stopBtn.classList.add("is-active");
+    stopBtn.classList.remove("is-disabled");
+    stopBtn.disabled = false;
+  }
+}
+
+function startPacketAnimation() {
+  state.animationMode = "running";
+  updateAnimationButtons();
+
+  if (typeof drawScene === "function") {
+    drawScene(performance.now());
+  }
+
+  setStatus("Animation started");
+}
+
+function pausePacketAnimation() {
+  state.animationMode = "paused";
+  updateAnimationButtons();
+
+  if (typeof drawScene === "function") {
+    drawScene(performance.now());
+  }
+
+  setStatus("Animation paused");
+}
+
+function stopPacketAnimation() {
+  state.animationMode = "stopped";
+  resetPacketAnimationClock();
+  updateAnimationButtons();
+
+  if (typeof drawScene === "function") {
+    drawScene(performance.now());
+  }
+
+  setStatus("Animation stopped");
+}
+
 function findWanDevice() {
   return state.devices.find(device => {
-    const name = device.name.toLowerCase();
-    const sub = (device.sub || "").toLowerCase();
+    const name = String(device.name || "").toLowerCase();
+    const sub = String(device.sub || "").toLowerCase();
+    const type = String(device.type || "").toLowerCase();
 
     return (
       name.includes("internet") ||
       name.includes("wan") ||
       sub.includes("wan") ||
-      sub.includes("isp")
+      sub.includes("isp") ||
+      type === "cloud"
     );
   });
 }
@@ -1999,8 +2090,8 @@ function getPacketStartDevices(wanId) {
   return state.devices.filter(device => {
     if (device.id === wanId) return false;
 
-    const name = device.name.toLowerCase();
-    const type = (device.type || "").toLowerCase();
+    const name = String(device.name || "").toLowerCase();
+    const type = String(device.type || "").toLowerCase();
 
     if (name.includes("internet")) return false;
     if (name.includes("wan")) return false;
@@ -2011,6 +2102,7 @@ function getPacketStartDevices(wanId) {
     if (type.includes("switch")) return false;
     if (type.includes("firewall")) return false;
     if (type.includes("router")) return false;
+    if (type === "cloud") return false;
 
     return degree[device.id] >= 1;
   });
@@ -2096,6 +2188,10 @@ function pointAlongSegments(segments, t) {
 }
 
 function drawNetworkPackets(timestamp = 0) {
+  const packetTimestamp = getPacketAnimationTimestamp(timestamp);
+
+  if (packetTimestamp === null) return;
+
   const wanDevice = findWanDevice();
 
   if (!wanDevice) return;
@@ -2114,7 +2210,7 @@ function drawNetworkPackets(timestamp = 0) {
 
     const baseSpeed = 9000;
     const speed = baseSpeed / Math.max(state.packetSpeed || 0.55, 0.05);
-    const raw = ((timestamp + index * 950) % speed) / speed;
+    const raw = ((packetTimestamp + index * 950) % speed) / speed;
 
     const t = raw < 0.5 ? raw * 2 : 2 - raw * 2;
 
@@ -2518,3 +2614,11 @@ if (typeof zoomText !== "undefined" && zoomText) {
     fitView();
   });
 }
+
+window.addEventListener("load", () => {
+  if (!state.animationMode) {
+    state.animationMode = "running";
+  }
+
+  updateAnimationButtons();
+});

@@ -223,6 +223,7 @@ function getConnectionModalValues() {
     to,
     toPort,
     style: typeof connStyle !== 'undefined' ? connStyle.value : 'solid',
+    shape: typeof connShape !== 'undefined' ? connShape.value : 'smart',
     status: typeof connStatus !== 'undefined' ? connStatus.value : 'online'
   };
 }
@@ -391,6 +392,10 @@ function openConnectionModal() {
     connTo.value = state.devices[1].id;
   }
 
+  if (typeof connShape !== 'undefined' && connShape) {
+    connShape.value = 'smart';
+  }
+
   refreshConnectionModalPorts();
   updateConnectionAddButtonState();
 
@@ -401,6 +406,7 @@ function addConnection() {
   const from = Number(connFrom.value);
   const to = Number(connTo.value);
   const style = connStyle.value;
+  const shape = typeof connShape !== 'undefined' ? connShape.value : 'smart';
   const status = connStatus.value;
 
   if (from === to) {
@@ -456,6 +462,7 @@ function addConnection() {
     note: '',
 
     style,
+    shape,
     status,
     color: '',
     points: [],

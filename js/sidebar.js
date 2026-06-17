@@ -1276,6 +1276,10 @@ function renderZoneDetailsPanel(zone) {
           <span>DHCP</span>
           <strong>${escapeHtml(formatDhcpValue(zone.dhcp))}</strong>
         </div>
+        <div class="details-meta-row">
+          <span>Rotation</span>
+          <strong>${escapeHtml(String(zone.rotation || 0))}°</strong>
+        </div>
       </div>
     </div>
   `;
@@ -1463,6 +1467,10 @@ function renderHighlightedConnectionCard(connection) {
         <div>
           <span>Style</span>
           <strong>${escapeHtml(connection.style || 'solid')}</strong>
+        </div>
+        <div>
+          <span>Shape</span>
+          <strong>${escapeHtml(connection.shape || 'smart')}</strong>
         </div>
       </div>
     </div>
@@ -1749,6 +1757,10 @@ function renderConnectionDetailsPanel(connection) {
           <span>Style</span>
           <strong>${escapeHtml(connection.style || 'solid')}</strong>
         </div>
+        <div class="details-meta-row">
+          <span>Shape</span>
+          <strong>${escapeHtml(connection.shape || 'smart')}</strong>
+        </div>
       </div>
     </div>
   `;
@@ -1871,12 +1883,13 @@ function renderZoneItem(zone) {
 
   const vlanText = zone.vlanId ? 'VLAN ' + zone.vlanId : 'No VLAN ID';
   const subnetText = zone.subnet ? ' · ' + zone.subnet : '';
+  const rotationText = zone.rotation ? ' · ' + zone.rotation + '°' : '';
 
   div.innerHTML = `
     <div class="dot" style="background:${zone.color};border-radius:2px"></div>
     <div class="item-main">
       <div class="item-name">${escapeHtml(zone.name)}</div>
-      <div class="item-sub">${escapeHtml(vlanText + subnetText)}</div>
+      <div class="item-sub">${escapeHtml(vlanText + subnetText + rotationText)}</div>
     </div>
     <button class="delete-mini" onclick="event.stopPropagation();removeZone(${zone.id})">×</button>
   `;
@@ -2031,6 +2044,9 @@ function selectItem(type, id) {
   if (type === 'zone') {
     const item = state.zones.find(zone => zone.id === id);
     if (!item) return;
+    if (item.rotation === undefined || item.rotation === null) {
+      item.rotation = 0;
+    }
 
     propTitle.innerHTML = '<span>Selected VLAN Zone</span>';
     mountSelectedColorPicker(item.color);
@@ -2075,6 +2091,10 @@ function selectItem(type, id) {
     const item = state.connections.find(connection => connection.id === id);
     if (!item) return;
 
+    if (!item.shape) {
+      item.shape = 'smart';
+    }
+
     state.highlightedConnectionId = item.id;
     state.highlightedPortKey = null;
 
@@ -2092,8 +2112,13 @@ function selectItem(type, id) {
 
     propConnFrom.value = item.from;
     propConnTo.value = item.to;
-    propConnStyle.value = item.style;
-    propConnStatus.value = item.status;
+    propConnStyle.value = item.style || 'solid';
+
+    if (typeof propConnShape !== 'undefined' && propConnShape) {
+      propConnShape.value = item.shape || 'smart';
+    }
+
+    propConnStatus.value = item.status || 'online';
 
     if (typeof refreshSelectedConnectionPorts === 'function') {
       refreshSelectedConnectionPorts();
@@ -2327,6 +2352,7 @@ function updateSelected(field, value) {
     }
 
     if (field === 'style') item.style = value;
+    if (field === 'shape') item.shape = value || 'smart';
     if (field === 'status') item.status = value;
     if (field === 'fromSide') item.fromSide = value;
     if (field === 'toSide') item.toSide = value;

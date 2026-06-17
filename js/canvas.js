@@ -3,6 +3,7 @@ const wrap = document.getElementById("canvasWrap");
 const ctx = canvas.getContext("2d");
 
 let draggingBendPoint = null;
+let selectedBendPoint = null;
 let draggingSelectionGroup = null;
 let zoneMoveSnapshot = null;
 
@@ -57,6 +58,13 @@ function getDeviceCenter(device) {
   return {
     x: device.x + device.w / 2,
     y: device.y + device.h / 2
+  };
+}
+
+function getZoneCenter(zone) {
+  return {
+    x: zone.x + zone.w / 2,
+    y: zone.y + zone.h / 2
   };
 }
 
@@ -969,6 +977,12 @@ document.addEventListener("keydown", e => {
   }
 
   if (key === "delete" || key === "backspace") {
+    if (selectedBendPoint) {
+      e.preventDefault();
+      deleteSelectedBendPoint();
+      return;
+    }
+
     const selected = getActiveSelectableItems();
 
     if (selected.length) {
@@ -985,6 +999,41 @@ document.addEventListener("keydown", e => {
     setStatus("Selection cleared");
   }
 });
+function deleteSelectedBendPoint() {
+  if (!selectedBendPoint) {
+    setStatus("⚠ Select a bend point first");
+    return;
+  }
+
+  const connection = state.connections.find(item =>
+    Number(item.id) === Number(selectedBendPoint.connectionId)
+  );
+
+  if (!connection || !Array.isArray(connection.points)) {
+    selectedBendPoint = null;
+    setStatus("⚠ Bend point not found");
+    return;
+  }
+
+  const index = Number(selectedBendPoint.index);
+
+  if (index < 0 || index >= connection.points.length) {
+    selectedBendPoint = null;
+    setStatus("⚠ Bend point not found");
+    return;
+  }
+
+  pushHistory();
+
+  connection.points.splice(index, 1);
+  selectedBendPoint = null;
+
+  state.highlightedConnectionId = connection.id;
+  state.highlightedPortKey = null;
+
+  selectItem("connection", connection.id);
+  setStatus("Bend point deleted");
+}
 
 /* =========================
    HIT TESTING
@@ -1020,12 +1069,22 @@ function hitDevice(x, y) {
 function hitZoneResize(x, y) {
   for (let i = state.zones.length - 1; i >= 0; i--) {
     const zone = state.zones[i];
+    const center = getZoneCenter(zone);
+    const rotation = zone.rotation || 0;
+
+    const point = rotatePointAroundCenter(
+      x,
+      y,
+      center.x,
+      center.y,
+      rotation
+    );
 
     if (
-      x >= zone.x + zone.w - 20 &&
-      x <= zone.x + zone.w &&
-      y >= zone.y + zone.h - 20 &&
-      y <= zone.y + zone.h
+      point.x >= zone.x + zone.w - 20 &&
+      point.x <= zone.x + zone.w &&
+      point.y >= zone.y + zone.h - 20 &&
+      point.y <= zone.y + zone.h
     ) {
       return zone;
     }
@@ -1037,12 +1096,22 @@ function hitZoneResize(x, y) {
 function hitZone(x, y) {
   for (let i = state.zones.length - 1; i >= 0; i--) {
     const zone = state.zones[i];
+    const center = getZoneCenter(zone);
+    const rotation = zone.rotation || 0;
+
+    const point = rotatePointAroundCenter(
+      x,
+      y,
+      center.x,
+      center.y,
+      rotation
+    );
 
     if (
-      x >= zone.x &&
-      x <= zone.x + zone.w &&
-      y >= zone.y &&
-      y <= zone.y + zone.h
+      point.x >= zone.x &&
+      point.x <= zone.x + zone.w &&
+      point.y >= zone.y &&
+      point.y <= zone.y + zone.h
     ) {
       return zone;
     }
@@ -1276,14 +1345,17 @@ function hitBendPoint(x, y) {
 ========================= */
 
 function getDeviceAnchor(device, otherDevice, side = "auto") {
+  const scale = state.boxScale || 1;
+  const inset = 20 * scale;
+
   const cx = device.x + device.w / 2;
   const cy = device.y + device.h / 2;
 
   if (side === "center") return [cx, cy];
-  if (side === "top") return [cx, device.y];
-  if (side === "right") return [device.x + device.w, cy];
-  if (side === "bottom") return [cx, device.y + device.h];
-  if (side === "left") return [device.x, cy];
+  if (side === "top") return [cx, device.y + inset];
+  if (side === "right") return [device.x + device.w - inset, cy];
+  if (side === "bottom") return [cx, device.y + device.h - inset];
+  if (side === "left") return [device.x + inset, cy];
 
   const ox = otherDevice.x + otherDevice.w / 2;
   const oy = otherDevice.y + otherDevice.h / 2;
@@ -1293,13 +1365,13 @@ function getDeviceAnchor(device, otherDevice, side = "auto") {
 
   if (Math.abs(dx) > Math.abs(dy)) {
     return dx > 0
-      ? [device.x + device.w, cy]
-      : [device.x, cy];
+      ? [device.x + device.w - inset, cy]
+      : [device.x + inset, cy];
   }
 
   return dy > 0
-    ? [cx, device.y + device.h]
-    : [cx, device.y];
+    ? [cx, device.y + device.h - inset]
+    : [cx, device.y + inset];
 }
 
 function routePoints(fromDevice, toDevice) {
@@ -1335,6 +1407,10 @@ function routePoints(fromDevice, toDevice) {
   ];
 }
 
+function getConnectionShape(connection) {
+  return connection.shape || "smart";
+}
+
 function getConnectionPoints(connection, fromDevice, toDevice) {
   const isForward = fromDevice.id === connection.from;
 
@@ -1348,6 +1424,7 @@ function getConnectionPoints(connection, fromDevice, toDevice) {
 
   const start = getDeviceAnchor(fromDevice, toDevice, fromSide);
   const end = getDeviceAnchor(toDevice, fromDevice, toSide);
+  const shape = getConnectionShape(connection);
 
   if (!Array.isArray(connection.points)) {
     connection.points = [];
@@ -1357,6 +1434,14 @@ function getConnectionPoints(connection, fromDevice, toDevice) {
 
   if (!isForward) {
     customPoints = customPoints.reverse();
+  }
+
+  if (shape === "direct" || shape === "curved") {
+    return [
+      start,
+      ...customPoints,
+      end
+    ];
   }
 
   if (customPoints.length) {
@@ -1400,13 +1485,97 @@ function routePointsWithAnchors(start, end) {
   ];
 }
 
+function getTwoPointCurveControl(start, end) {
+  const ax = start[0];
+  const ay = start[1];
+  const bx = end[0];
+  const by = end[1];
+  const dx = bx - ax;
+  const dy = by - ay;
+  const distance = Math.hypot(dx, dy) || 1;
+  const offset = Math.min(120, Math.max(36, distance * 0.18));
+
+  return [
+    (ax + bx) / 2 - (dy / distance) * offset,
+    (ay + by) / 2 + (dx / distance) * offset
+  ];
+}
+
+function getQuadraticPoint(start, control, end, t) {
+  const oneMinusT = 1 - t;
+
+  return [
+    oneMinusT * oneMinusT * start[0] + 2 * oneMinusT * t * control[0] + t * t * end[0],
+    oneMinusT * oneMinusT * start[1] + 2 * oneMinusT * t * control[1] + t * t * end[1]
+  ];
+}
+
+function sampleCurvedConnectionPoints(points) {
+  if (!Array.isArray(points) || points.length < 2) return points || [];
+
+  const sampled = [];
+  const steps = 28;
+
+  if (points.length === 2) {
+    const control = getTwoPointCurveControl(points[0], points[1]);
+
+    for (let i = 0; i <= steps; i++) {
+      sampled.push(getQuadraticPoint(points[0], control, points[1], i / steps));
+    }
+
+    return sampled;
+  }
+
+  if (points.length === 3) {
+    for (let i = 0; i <= steps; i++) {
+      sampled.push(getQuadraticPoint(points[0], points[1], points[2], i / steps));
+    }
+
+    return sampled;
+  }
+
+  sampled.push(points[0]);
+
+  for (let i = 1; i < points.length - 1; i++) {
+    const previous = points[i - 1];
+    const current = points[i];
+    const next = points[i + 1];
+    const midA = [
+      (previous[0] + current[0]) / 2,
+      (previous[1] + current[1]) / 2
+    ];
+    const midB = [
+      (current[0] + next[0]) / 2,
+      (current[1] + next[1]) / 2
+    ];
+
+    for (let step = 1; step <= steps; step++) {
+      sampled.push(getQuadraticPoint(midA, current, midB, step / steps));
+    }
+  }
+
+  sampled.push(points[points.length - 1]);
+
+  return sampled;
+}
+
+function getConnectionHitPoints(connection, fromDevice, toDevice) {
+  const points = getConnectionPoints(connection, fromDevice, toDevice);
+
+  if (getConnectionShape(connection) === "curved") {
+    return sampleCurvedConnectionPoints(points);
+  }
+
+  return points;
+}
+
 function findClosestConnectionSegment(x, y, connection) {
   const fromDevice = state.devices.find(device => device.id === connection.from);
   const toDevice = state.devices.find(device => device.id === connection.to);
 
   if (!fromDevice || !toDevice) return null;
 
-  const points = getConnectionPoints(connection, fromDevice, toDevice);
+  const points = getConnectionHitPoints(connection, fromDevice, toDevice);
   let best = null;
 
   for (let i = 0; i < points.length - 1; i++) {
@@ -1439,25 +1608,49 @@ function addBendPointToConnection(connection, x, y) {
     connection.points = [];
   }
 
-  const closest = findClosestConnectionSegment(x, y, connection);
-
-  if (!closest) return;
-
   pushHistory();
 
-  const insertIndex = Math.max(0, closest.segmentIndex);
+  const shape = getConnectionShape(connection);
 
-  connection.points.splice(insertIndex, 0, {
-    x: closest.x,
-    y: closest.y
-  });
+  if (shape === "curved" && connection.points.length === 0) {
+    connection.points.push({
+      x,
+      y
+    });
+
+    selectedBendPoint = {
+      connectionId: connection.id,
+      index: 0
+    };
+  } else {
+    const closest = findClosestConnectionSegment(x, y, connection);
+
+    if (!closest) return;
+
+    const insertIndex = Math.max(0, Math.min(closest.segmentIndex, connection.points.length));
+
+    connection.points.splice(insertIndex, 0, {
+      x: closest.x,
+      y: closest.y
+    });
+
+    selectedBendPoint = {
+      connectionId: connection.id,
+      index: insertIndex
+    };
+  }
 
   state.highlightedConnectionId = connection.id;
   state.highlightedPortKey = null;
   clearMultiSelectionOnly();
 
   selectItem("connection", connection.id);
-  setStatus("Bend point added");
+
+  if (shape === "curved") {
+    setStatus("Curve handle added · drag the dot up or down to shape the cable");
+  } else {
+    setStatus("Bend point added");
+  }
 }
 
 function deleteBendPoint(hit) {
@@ -1466,6 +1659,7 @@ function deleteBendPoint(hit) {
   pushHistory();
 
   hit.connection.points.splice(hit.index, 1);
+  selectedBendPoint = null;
 
   state.highlightedConnectionId = hit.connection.id;
   state.highlightedPortKey = null;
@@ -1483,7 +1677,7 @@ function hitConnection(x, y) {
 
     if (!fromDevice || !toDevice) continue;
 
-    const points = getConnectionPoints(connection, fromDevice, toDevice);
+    const points = getConnectionHitPoints(connection, fromDevice, toDevice);
 
     for (let p = 0; p < points.length - 1; p++) {
       const distance = distanceToSegment(
@@ -1531,6 +1725,11 @@ canvas.addEventListener("mousedown", e => {
 
     smartSnapActive = false;
     smartSnapType = "";
+
+    selectedBendPoint = {
+      connectionId: bendHit.connection.id,
+      index: bendHit.index
+    };
 
     state.highlightedConnectionId = bendHit.connection.id;
     state.highlightedPortKey = null;
@@ -1580,6 +1779,9 @@ canvas.addEventListener("mousedown", e => {
     startZoneMoveTrackingForDevices([device]);
 
     clearMultiSelectionOnly();
+    selectedBendPoint = null;
+    state.highlightedConnectionId = null;
+    state.highlightedPortKey = null;
 
     dragging = device;
     dragOffsetX = point.x - device.x;
@@ -1593,6 +1795,7 @@ canvas.addEventListener("mousedown", e => {
 
   if (connection) {
     clearMultiSelectionOnly();
+    selectedBendPoint = null;
 
     state.highlightedConnectionId = connection.id;
     state.highlightedPortKey = null;
@@ -1619,6 +1822,9 @@ canvas.addEventListener("mousedown", e => {
     startZoneMoveTrackingForDevices(state.devices);
 
     clearMultiSelectionOnly();
+    selectedBendPoint = null;
+    state.highlightedConnectionId = null;
+    state.highlightedPortKey = null;
 
     dragging = zone;
     dragOffsetX = point.x - zone.x;
@@ -1628,6 +1834,7 @@ canvas.addEventListener("mousedown", e => {
     return;
   }
 
+  selectedBendPoint = null;
   clearSelection();
 
   panning = true;
@@ -1668,7 +1875,15 @@ canvas.addEventListener("mousemove", e => {
   }
 
   if (draggingBendPoint) {
-    const snappedPoint = applySmartBendSnap(point, draggingBendPoint);
+    const shape = getConnectionShape(draggingBendPoint.connection);
+    const snappedPoint = shape === "smart"
+      ? applySmartBendSnap(point, draggingBendPoint)
+      : point;
+
+    if (shape !== "smart") {
+      smartSnapActive = false;
+      smartSnapType = "";
+    }
 
     draggingBendPoint.point.x = snappedPoint.x;
     draggingBendPoint.point.y = snappedPoint.y;
@@ -1717,6 +1932,20 @@ canvas.addEventListener("mouseup", () => {
 
   finishZoneMoveTracking();
 
+  if (draggingBendPoint) {
+    selectedBendPoint = {
+      connectionId: draggingBendPoint.connection.id,
+      index: draggingBendPoint.index
+    };
+
+    state.highlightedConnectionId = draggingBendPoint.connection.id;
+    state.highlightedPortKey = null;
+
+    if (typeof markInspectorDirty === "function") {
+      markInspectorDirty();
+    }
+  }
+
   dragging = null;
   draggingSelectionGroup = null;
   draggingBendPoint = null;
@@ -1734,6 +1963,20 @@ canvas.addEventListener("mouseleave", () => {
   }
 
   finishZoneMoveTracking();
+
+  if (draggingBendPoint) {
+    selectedBendPoint = {
+      connectionId: draggingBendPoint.connection.id,
+      index: draggingBendPoint.index
+    };
+
+    state.highlightedConnectionId = draggingBendPoint.connection.id;
+    state.highlightedPortKey = null;
+
+    if (typeof markInspectorDirty === "function") {
+      markInspectorDirty();
+    }
+  }
 
   dragging = null;
   draggingSelectionGroup = null;
@@ -1810,6 +2053,44 @@ function drawPolyline(points) {
   ctx.stroke();
 }
 
+function drawConnectionPath(connection, points) {
+  const shape = getConnectionShape(connection);
+
+  if (shape !== "curved" || !Array.isArray(points) || points.length < 2) {
+    drawPolyline(points);
+    return;
+  }
+
+  ctx.beginPath();
+  ctx.moveTo(points[0][0], points[0][1]);
+
+  if (points.length === 2) {
+    const control = getTwoPointCurveControl(points[0], points[1]);
+    ctx.quadraticCurveTo(control[0], control[1], points[1][0], points[1][1]);
+    ctx.stroke();
+    return;
+  }
+
+  if (points.length === 3) {
+    ctx.quadraticCurveTo(points[1][0], points[1][1], points[2][0], points[2][1]);
+    ctx.stroke();
+    return;
+  }
+
+  for (let i = 1; i < points.length - 1; i++) {
+    const current = points[i];
+    const next = points[i + 1];
+    const midX = (current[0] + next[0]) / 2;
+    const midY = (current[1] + next[1]) / 2;
+
+    ctx.quadraticCurveTo(current[0], current[1], midX, midY);
+  }
+
+  const last = points[points.length - 1];
+  ctx.lineTo(last[0], last[1]);
+  ctx.stroke();
+}
+
 function drawConnection(connection, index, timestamp) {
   const fromDevice = state.devices.find(device => device.id === connection.from);
   const toDevice = state.devices.find(device => device.id === connection.to);
@@ -1842,7 +2123,7 @@ function drawConnection(connection, index, timestamp) {
       ctx.setLineDash([8 * scale, 7 * scale]);
     }
 
-    drawPolyline(points);
+    drawConnectionPath(connection, points);
     ctx.restore();
 
     ctx.save();
@@ -1854,7 +2135,7 @@ function drawConnection(connection, index, timestamp) {
       ctx.setLineDash([8 * scale, 7 * scale]);
     }
 
-    drawPolyline(points);
+    drawConnectionPath(connection, points);
     ctx.restore();
   }
 
@@ -1885,20 +2166,25 @@ function drawConnection(connection, index, timestamp) {
     ctx.shadowBlur = highlighted ? 18 * scale : 12 * scale;
   }
 
-  drawPolyline(points);
+  drawConnectionPath(connection, points);
   ctx.restore();
 
   if (active && Array.isArray(connection.points)) {
-    connection.points.forEach(point => {
+    connection.points.forEach((point, pointIndex) => {
+      const isSelectedPoint =
+        selectedBendPoint &&
+        Number(selectedBendPoint.connectionId) === Number(connection.id) &&
+        Number(selectedBendPoint.index) === Number(pointIndex);
+
       ctx.save();
-      ctx.fillStyle = "#020c1b";
-      ctx.strokeStyle = color;
-      ctx.lineWidth = 2 * scale;
+      ctx.fillStyle = isSelectedPoint ? color : "#020c1b";
+      ctx.strokeStyle = isSelectedPoint ? "#ffffff" : color;
+      ctx.lineWidth = isSelectedPoint ? 2.6 * scale : 2 * scale;
       ctx.shadowColor = color;
-      ctx.shadowBlur = 10 * scale;
+      ctx.shadowBlur = isSelectedPoint ? 18 * scale : 10 * scale;
 
       ctx.beginPath();
-      ctx.arc(point.x, point.y, 7 * scale, 0, Math.PI * 2);
+      ctx.arc(point.x, point.y, isSelectedPoint ? 8.5 * scale : 7 * scale, 0, Math.PI * 2);
       ctx.fill();
       ctx.stroke();
 
@@ -2112,30 +2398,34 @@ function flattenRouteSegments(path) {
   const segments = [];
 
   for (let i = 0; i < path.length - 1; i++) {
-    const fromDevice = state.devices.find(device => device.id === path[i]);
-    const toDevice = state.devices.find(device => device.id === path[i + 1]);
-    const connection = getConnectionBetween(path[i], path[i + 1]);
+    const pathFromId = Number(path[i]);
+    const pathToId = Number(path[i + 1]);
+    const connection = getConnectionBetween(pathFromId, pathToId);
 
-    if (!fromDevice || !toDevice || !connection) continue;
+    if (!connection) continue;
 
-    const routedPoints = getConnectionPoints(connection, fromDevice, toDevice);
+    /*
+      Important:
+      Always build packet animation points using the same stored
+      from/to direction used when the line is drawn on the canvas.
+      If the packet route is traveling the connection backward,
+      reverse the sampled points after building them.
+
+      This keeps default curved lines from flipping to the opposite
+      side of the cable when animation travels in reverse.
+    */
+    const drawFromDevice = state.devices.find(device => Number(device.id) === Number(connection.from));
+    const drawToDevice = state.devices.find(device => Number(device.id) === Number(connection.to));
+
+    if (!drawFromDevice || !drawToDevice) continue;
+
+    let points = getConnectionHitPoints(connection, drawFromDevice, drawToDevice);
+
+    if (pathFromId !== Number(connection.from)) {
+      points = points.slice().reverse();
+    }
+
     const color = getConnectionColor(connection);
-
-    const fromCenter = [
-      fromDevice.x + fromDevice.w / 2,
-      fromDevice.y + fromDevice.h / 2
-    ];
-
-    const toCenter = [
-      toDevice.x + toDevice.w / 2,
-      toDevice.y + toDevice.h / 2
-    ];
-
-    const points = [
-      fromCenter,
-      ...routedPoints,
-      toCenter
-    ];
 
     for (let p = 0; p < points.length - 1; p++) {
       const from = points[p];
@@ -2263,8 +2553,15 @@ function drawZone(zone) {
   const scale = state.boxScale || 1;
   const borderWidth = (zone.borderWidth || 1.5) * scale;
   const opacity = zone.opacity ?? 0.06;
+  const rotation = zone.rotation || 0;
+  const center = getZoneCenter(zone);
 
   ctx.save();
+
+  ctx.translate(center.x, center.y);
+  ctx.rotate(rotation * Math.PI / 180);
+  ctx.translate(-center.x, -center.y);
+
   ctx.strokeStyle = color;
   ctx.lineWidth = selected ? borderWidth + 1.4 : borderWidth;
   applyZoneLineStyle(zone);
@@ -2285,19 +2582,21 @@ function drawZone(zone) {
   roundRect(zone.x, zone.y, zone.w, zone.h, 14 * scale);
   ctx.fill();
 
-  ctx.setLineDash([]);
-  ctx.globalAlpha = selected ? 0.95 : 0.72;
-  ctx.fillStyle = color;
-  ctx.font = "700 " + Math.max(10, state.fontSize * 0.75) + "px \"JetBrains Mono\", monospace";
-  ctx.textAlign = "left";
-  ctx.fillText(zone.name.toUpperCase(), zone.x + 14 * scale, zone.y + 22 * scale);
-
   ctx.globalAlpha = selected ? 0.8 : 0.28;
   ctx.beginPath();
   ctx.moveTo(zone.x + zone.w - 18 * scale, zone.y + zone.h);
   ctx.lineTo(zone.x + zone.w, zone.y + zone.h);
   ctx.lineTo(zone.x + zone.w, zone.y + zone.h - 18 * scale);
   ctx.fill();
+
+  ctx.setLineDash([]);
+  ctx.shadowBlur = 0;
+  ctx.globalAlpha = selected ? 0.95 : 0.72;
+  ctx.fillStyle = color;
+  ctx.font = "700 " + Math.max(10, state.fontSize * 0.75) + "px \"JetBrains Mono\", monospace";
+  ctx.textAlign = "left";
+  ctx.textBaseline = "alphabetic";
+  ctx.fillText(zone.name.toUpperCase(), zone.x + 14 * scale, zone.y + 22 * scale);
 
   ctx.restore();
 }
@@ -2367,6 +2666,30 @@ function drawDevice(device) {
   ctx.fill();
 
   ctx.restore();
+}
+
+function rotateSelectedZone(direction = 1) {
+  if (state.selectedType !== "zone") {
+    setStatus("Select a VLAN zone first to rotate it");
+    return;
+  }
+
+  const zone = state.zones.find(item => Number(item.id) === Number(state.selectedId));
+
+  if (!zone) return;
+
+  pushHistory();
+
+  const currentRotation = Number(zone.rotation || 0);
+  zone.rotation = (currentRotation + direction * 90 + 360) % 360;
+
+  if (typeof markInspectorDirty === "function") {
+    markInspectorDirty();
+  }
+
+  refreshSidebar();
+
+  setStatus("Rotated " + (zone.name || "VLAN zone") + " to " + zone.rotation + "°");
 }
 
 function drawIconTile(device, color) {

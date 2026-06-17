@@ -186,6 +186,7 @@ function buildDefaultProject() {
       borderStyle: 'dashed',
       borderWidth: 1.5,
       opacity,
+      rotation: 0,
 
       /*
         Phase 6.1:

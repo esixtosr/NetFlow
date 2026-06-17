@@ -87,13 +87,13 @@
 
       <div class="topbar-tool-label">Rotate:</div>
 
-      <div class="rotate-action-group" aria-label="Device rotation actions">
+      <div class="rotate-action-group" aria-label="Rotation actions">
         <button
           id="rotateLeftActionBtn"
           class="rotate-action-btn disabled"
           onclick="handleRotateLeftButton()"
-          title="Select a device to rotate left"
-          aria-label="Rotate selected device left"
+          title="Select a device or VLAN zone to rotate left"
+          aria-label="Rotate selected item left"
         >
           <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.15" stroke-linecap="round" stroke-linejoin="round">
             <path stroke="none" d="M0 0h24v24H0z" fill="none" />
@@ -105,8 +105,8 @@
           id="rotateRightActionBtn"
           class="rotate-action-btn disabled"
           onclick="handleRotateRightButton()"
-          title="Select a device to rotate right"
-          aria-label="Rotate selected device right"
+          title="Select a device or VLAN zone to rotate right"
+          aria-label="Rotate selected item right"
         >
           <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.15" stroke-linecap="round" stroke-linejoin="round">
             <path stroke="none" d="M0 0h24v24H0z" fill="none" />
@@ -461,6 +461,13 @@
                   <option value="dashed">Dashed / Wireless</option>
                 </select>
 
+                <label>Line Shape</label>
+                <select id="propConnShape" class="select" onchange="updateSelected('shape',this.value)">
+                  <option value="smart">Smart Route</option>
+                  <option value="direct">Direct Line</option>
+                  <option value="curved">Curved Line</option>
+                </select>
+
                 <label>Status</label>
                 <select id="propConnStatus" class="select" onchange="updateSelected('status',this.value)">
                   <option value="online">Online</option>
@@ -766,6 +773,15 @@
         </div>
 
         <div>
+          <label>Shape</label>
+          <select id="connShape" class="select" onchange="updateConnectionAddButtonState()">
+            <option value="smart">Smart Route</option>
+            <option value="direct">Direct Line</option>
+            <option value="curved">Curved Line</option>
+          </select>
+        </div>
+
+        <div>
           <label>Status</label>
           <select id="connStatus" class="select" onchange="updateConnectionAddButtonState()">
             <option value="online">Online</option>
@@ -933,6 +949,8 @@
       if (!addBtn || !removeBtn || typeof state === 'undefined') return;
 
       const deviceSelected = state.selectedType === 'device';
+      const zoneSelected = state.selectedType === 'zone';
+      const rotatableSelected = deviceSelected || zoneSelected;
       const connectionSelected = state.selectedType === 'connection';
 
       addBtn.classList.toggle('enabled', deviceSelected);
@@ -950,19 +968,19 @@
         : 'Select a connection line to remove it';
 
       if (rotateLeftBtn && rotateRightBtn) {
-        rotateLeftBtn.classList.toggle('enabled', deviceSelected);
-        rotateLeftBtn.classList.toggle('disabled', !deviceSelected);
+        rotateLeftBtn.classList.toggle('enabled', rotatableSelected);
+        rotateLeftBtn.classList.toggle('disabled', !rotatableSelected);
 
-        rotateRightBtn.classList.toggle('enabled', deviceSelected);
-        rotateRightBtn.classList.toggle('disabled', !deviceSelected);
+        rotateRightBtn.classList.toggle('enabled', rotatableSelected);
+        rotateRightBtn.classList.toggle('disabled', !rotatableSelected);
 
-        rotateLeftBtn.title = deviceSelected
-          ? 'Rotate selected device left'
-          : 'Select a device to rotate left';
+        rotateLeftBtn.title = rotatableSelected
+          ? (zoneSelected ? 'Rotate selected VLAN zone left' : 'Rotate selected device left')
+          : 'Select a device or VLAN zone to rotate left';
 
-        rotateRightBtn.title = deviceSelected
-          ? 'Rotate selected device right'
-          : 'Select a device to rotate right';
+        rotateRightBtn.title = rotatableSelected
+          ? (zoneSelected ? 'Rotate selected VLAN zone right' : 'Rotate selected device right')
+          : 'Select a device or VLAN zone to rotate right';
       }
     }
 
@@ -988,14 +1006,20 @@
     }
 
     function handleRotateLeftButton() {
-      if (typeof state === 'undefined' || state.selectedType !== 'device') {
-        setStatus('Select a device first to rotate it');
+      if (typeof state === 'undefined' || (state.selectedType !== 'device' && state.selectedType !== 'zone')) {
+        setStatus('Select a device or VLAN zone first to rotate it');
         updateConnectionActionButtons();
         return;
       }
 
-      if (typeof rotateSelectedDevice === 'function') {
+      if (state.selectedType === 'device' && typeof rotateSelectedDevice === 'function') {
         rotateSelectedDevice(-1);
+        updateConnectionActionButtons();
+        return;
+      }
+
+      if (state.selectedType === 'zone' && typeof rotateSelectedZone === 'function') {
+        rotateSelectedZone(-1);
         updateConnectionActionButtons();
         return;
       }
@@ -1004,14 +1028,20 @@
     }
 
     function handleRotateRightButton() {
-      if (typeof state === 'undefined' || state.selectedType !== 'device') {
-        setStatus('Select a device first to rotate it');
+      if (typeof state === 'undefined' || (state.selectedType !== 'device' && state.selectedType !== 'zone')) {
+        setStatus('Select a device or VLAN zone first to rotate it');
         updateConnectionActionButtons();
         return;
       }
 
-      if (typeof rotateSelectedDevice === 'function') {
+      if (state.selectedType === 'device' && typeof rotateSelectedDevice === 'function') {
         rotateSelectedDevice(1);
+        updateConnectionActionButtons();
+        return;
+      }
+
+      if (state.selectedType === 'zone' && typeof rotateSelectedZone === 'function') {
+        rotateSelectedZone(1);
         updateConnectionActionButtons();
         return;
       }

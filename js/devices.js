@@ -220,6 +220,44 @@ function ensureDeviceNetworkOverrideFields(device) {
   }
 }
 
+function ensureDeviceWirelessFields(device) {
+  if (!device) return;
+
+  const type = String(device.type || '').toLowerCase();
+  const name = String(device.name || '').toLowerCase();
+  const sub = String(device.sub || '').toLowerCase();
+
+  const isWifiOrSsid =
+    type === 'wifi' ||
+    name.includes('ssid') ||
+    name.includes('wi-fi') ||
+    name.includes('wifi') ||
+    sub.includes('ssid') ||
+    sub.includes('wi-fi') ||
+    sub.includes('wifi');
+
+  if (!isWifiOrSsid) {
+    if (device.wifiBands === undefined) {
+      device.wifiBands = null;
+    }
+
+    return;
+  }
+
+  if (!device.wifiBands || typeof device.wifiBands !== 'object' || Array.isArray(device.wifiBands)) {
+    device.wifiBands = {
+      ghz24: true,
+      ghz5: true,
+      ghz6: false
+    };
+    return;
+  }
+
+  device.wifiBands.ghz24 = Boolean(device.wifiBands.ghz24);
+  device.wifiBands.ghz5 = Boolean(device.wifiBands.ghz5);
+  device.wifiBands.ghz6 = Boolean(device.wifiBands.ghz6);
+}
+
 function isDeviceNetworkInfrastructure(device) {
   if (!device) return false;
 
@@ -291,6 +329,7 @@ function syncDevicePorts(device, portCount) {
   const count = Math.max(1, Number(portCount) || 1);
 
   ensureDeviceNetworkOverrideFields(device);
+  ensureDeviceWirelessFields(device);
 
   if (!Array.isArray(device.ports)) {
     device.ports = [];
@@ -392,6 +431,20 @@ function addDevice() {
     rotation: 0,
 
     /*
+      Phase 8.1:
+      WiFi / SSID devices can advertise supported bands.
+      These bands describe what the SSID broadcasts overall;
+      individual wireless clients do not need per-device band assignments.
+    */
+    wifiBands: type === 'wifi'
+      ? {
+          ghz24: true,
+          ghz5: true,
+          ghz6: false
+        }
+      : null,
+
+    /*
       Phase 6.3:
       Manual network override fields.
       Blank means the device uses inherited VLAN network data.
@@ -419,6 +472,7 @@ function addDevice() {
     h: s.h
   };
 
+  ensureDeviceWirelessFields(newDevice);
   syncDevicePorts(newDevice, portCount);
 
   state.devices.push(newDevice);
@@ -493,6 +547,7 @@ function rotateSelectedDevice(direction = 1) {
   pushHistory();
 
   ensureDeviceNetworkOverrideFields(device);
+  ensureDeviceWirelessFields(device);
 
   device.rotation = ((device.rotation || 0) + direction * 90) % 360;
 

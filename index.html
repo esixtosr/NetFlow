@@ -352,7 +352,7 @@
                 <select id="propStatus" class="select" onchange="updateSelected('status',this.value)">
                   <option value="online">Online</option>
                   <option value="warning">Warning</option>
-                  <option value="down">Down</option>
+                  <option value="offline">Offline</option>
                 </select>
 
                 <div class="property-divider"></div>
@@ -439,16 +439,16 @@
               </div>
 
               <div id="connectionOnlyProps" style="display:none">
-                <label>From Device</label>
+                <label id="propConnFromLabel">From Device</label>
                 <select id="propConnFrom" class="select" onchange="updateSelected('from',this.value)"></select>
 
-                <label>From Port</label>
+                <label id="propConnFromPortLabel">From Port</label>
                 <select id="propConnFromPort" class="select" onchange="updateSelected('fromPort',this.value)"></select>
 
-                <label>To Device</label>
+                <label id="propConnToLabel">To Device</label>
                 <select id="propConnTo" class="select" onchange="updateSelected('to',this.value)"></select>
 
-                <label>To Port</label>
+                <label id="propConnToPortLabel">To Port</label>
                 <select id="propConnToPort" class="select" onchange="updateSelected('toPort',this.value)"></select>
 
                 <div class="property-divider"></div>
@@ -470,10 +470,10 @@
 
                 <label>Status</label>
                 <select id="propConnStatus" class="select" onchange="updateSelected('status',this.value)">
-                  <option value="online">Online</option>
-                  <option value="warning">Warning</option>
-                  <option value="down">Down</option>
-                  <option value="blocked">Blocked</option>
+                  <option value="online">ONLINE</option>
+                  <option value="warning">WARNING</option>
+                  <option value="offline">OFFLINE</option>
+                  <option value="blocked">BLOCKED</option>
                 </select>
 
                 <div class="property-divider"></div>
@@ -552,7 +552,7 @@
                   <select id="deviceStatus" class="select">
                     <option value="online">Online</option>
                     <option value="warning">Warning</option>
-                    <option value="down">Down</option>
+                    <option value="">Offline</option>
                   </select>
                 </div>
               </div>
@@ -745,18 +745,22 @@
 
   <div id="connectionModal" class="modal-bg">
     <div class="modal">
-      <h3>Add Connection</h3>
+      <h3 id="connectionModalTitle">Add Connection</h3>
 
-      <label>From Device</label>
+      <div id="connectionModalHint" class="connection-modal-hint">
+        Select two devices to create a wired connection or wireless association.
+      </div>
+
+      <label id="connFromLabel">From Device</label>
       <select id="connFrom" class="select" onchange="refreshConnectionModalPorts()"></select>
 
-      <label>From Port</label>
+      <label id="connFromPortLabel">From Port</label>
       <select id="connFromPort" class="select" onchange="updateConnectionAddButtonState()"></select>
 
-      <label>To Device</label>
+      <label id="connToLabel">To Device</label>
       <select id="connTo" class="select" onchange="refreshConnectionModalPorts()"></select>
 
-      <label>To Port</label>
+      <label id="connToPortLabel">To Port</label>
       <select id="connToPort" class="select" onchange="updateConnectionAddButtonState()"></select>
 
       <div id="connectionValidationMessage" class="connection-validation-message">
@@ -784,10 +788,10 @@
         <div>
           <label>Status</label>
           <select id="connStatus" class="select" onchange="updateConnectionAddButtonState()">
-            <option value="online">Online</option>
-            <option value="warning">Warning</option>
-            <option value="down">Down</option>
-            <option value="blocked">Blocked</option>
+            <option value="online">ONLINE</option>
+            <option value="warning">WARNING</option>
+            <option value="offline">OFFLINE</option>
+            <option value="blocked">BLOCKED</option>
           </select>
         </div>
       </div>

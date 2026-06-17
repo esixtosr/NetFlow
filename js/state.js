@@ -156,6 +156,20 @@ function buildDefaultProject() {
       rotation: 0,
 
       /*
+        Phase 8.1:
+        WiFi / SSID devices can advertise supported bands.
+        These bands describe what the SSID broadcasts overall;
+        individual wireless clients do not need per-device band assignments.
+      */
+      wifiBands: type === 'wifi'
+        ? {
+            ghz24: true,
+            ghz5: true,
+            ghz6: false
+          }
+        : null,
+
+      /*
         Phase 2:
         Starter devices include generated ports.
         Starter connections may still need to be re-added for exact port assignments.
@@ -438,6 +452,7 @@ function buildDefaultProject() {
       note: '',
 
       style,
+      shape: 'smart',
       status,
       color: '',
       points: [],

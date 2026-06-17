@@ -1646,10 +1646,13 @@ button:disabled {
 ========================= */
 
 .ports-section {
-  border: 1px solid color-mix(in srgb, var(--device-accent) 45%, var(--border));
+  border: 1px solid color-mix(in srgb, var(--vlan-color, var(--device-accent)) 45%, var(--border));
   border-radius: 10px;
   background: rgba(17, 34, 64, 0.22);
   overflow: hidden;
+  box-shadow:
+    inset 0 0 0 1px color-mix(in srgb, var(--vlan-color, var(--device-accent)) 10%, transparent),
+    0 0 16px color-mix(in srgb, var(--vlan-color, var(--device-accent)) 10%, transparent);
 }
 
 .ports-section-head {
@@ -1658,8 +1661,8 @@ button:disabled {
   justify-content: space-between;
   gap: 10px;
   padding: 12px 12px 10px;
-  border-bottom: 1px solid color-mix(in srgb, var(--device-accent) 28%, var(--border));
-  background: rgba(17, 34, 64, 0.32);
+  border-bottom: 1px solid color-mix(in srgb, var(--vlan-color, var(--device-accent)) 28%, var(--border));
+  background: color-mix(in srgb, var(--vlan-color, var(--device-accent)) 7%, rgba(17, 34, 64, 0.32));
 }
 
 .ports-section-title {
@@ -1711,8 +1714,8 @@ button:disabled {
 
 .ports-table-header {
   color: var(--muted);
-  background: rgba(2, 12, 27, 0.45);
-  border-bottom: 1px solid rgba(49, 68, 95, 0.72);
+  background: color-mix(in srgb, var(--vlan-color, var(--device-accent)) 4%, rgba(2, 12, 27, 0.45));
+  border-bottom: 1px solid color-mix(in srgb, var(--vlan-color, var(--device-accent)) 25%, rgba(49, 68, 95, 0.72));
   font-size: 9px;
   font-weight: 900;
   text-transform: uppercase;
@@ -3699,4 +3702,232 @@ button:disabled {
 
 #sizeMenu input[type="range"]::-moz-range-thumb {
   background: #64ffda !important;
+}
+
+.right-panel-reset-btn {
+  width: 100%;
+  margin: 10px 0 12px;
+  padding: 10px 12px;
+  border: 1px solid rgba(255, 167, 38, 0.85);
+  border-radius: 8px;
+  background: rgba(255, 167, 38, 0.10);
+  color: #ffb74d;
+  font-family: "JetBrains Mono", monospace;
+  font-size: 10px;
+  font-weight: 800;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  text-align: center;
+  cursor: pointer;
+  transition:
+    background 160ms ease,
+    border-color 160ms ease,
+    color 160ms ease,
+    box-shadow 160ms ease,
+    transform 160ms ease;
+}
+
+.right-panel-reset-btn:hover {
+  background: rgba(255, 167, 38, 0.18);
+  border-color: #ffb74d;
+  color: #ffd180;
+  box-shadow: 0 0 16px rgba(255, 167, 38, 0.22);
+  transform: translateY(-1px);
+}
+
+.right-panel-reset-btn:active {
+  transform: translateY(0);
+  box-shadow: none;
+}
+
+.right-panel-reset-btn:focus-visible {
+  outline: 2px solid rgba(255, 167, 38, 0.75);
+  outline-offset: 2px;
+}
+
+/* Wireless clients table: match ports table and follow VLAN color */
+.wireless-clients-card {
+  padding: 0;
+  overflow: hidden;
+  border-color: color-mix(in srgb, var(--vlan-color, var(--device-accent)) 45%, var(--border));
+  box-shadow:
+    inset 0 0 0 1px color-mix(in srgb, var(--vlan-color, var(--device-accent)) 10%, transparent),
+    0 0 16px color-mix(in srgb, var(--vlan-color, var(--device-accent)) 10%, transparent);
+}
+
+.wireless-clients-card .ports-section-head {
+  padding: 14px 14px 12px;
+  border-bottom: 1px solid color-mix(in srgb, var(--vlan-color, var(--device-accent)) 28%, var(--border));
+  background: color-mix(in srgb, var(--vlan-color, var(--device-accent)) 7%, rgba(17, 34, 64, 0.32));
+}
+
+.wireless-clients-table {
+  border: 0;
+  border-radius: 0;
+  margin-top: 0;
+}
+
+.wireless-clients-table .ports-table-header,
+.wireless-client-table-row {
+  grid-template-columns: minmax(118px, 1.45fr) minmax(92px, 1fr) 70px;
+}
+
+.wireless-clients-table .ports-table-header {
+  border-bottom-color: color-mix(in srgb, var(--vlan-color, var(--device-accent)) 25%, rgba(49, 68, 95, 0.72));
+}
+
+.wireless-client-table-row {
+  border-radius: 0;
+}
+
+.wireless-client-table-row .ports-table-cell {
+  min-height: 42px;
+}
+
+.wireless-client-table-row .connected-device {
+  font-weight: 800;
+  color: var(--text);
+}
+
+.wireless-client-table-row .ports-device-dot {
+  box-shadow: 0 0 12px var(--vlan-color, var(--device-accent));
+}
+
+.wireless-client-table-row:hover {
+  background: color-mix(in srgb, var(--vlan-color, var(--device-accent)) 10%, rgba(17, 34, 64, 0.38));
+}
+
+.wireless-client-table-row.is-highlighted {
+  background: color-mix(in srgb, var(--vlan-color, var(--device-accent)) 18%, rgba(17, 34, 64, 0.5));
+  box-shadow:
+    inset 3px 0 0 var(--vlan-color, var(--device-accent)),
+    inset 0 0 0 1px color-mix(in srgb, var(--vlan-color, var(--device-accent)) 35%, transparent);
+}
+
+.wireless-client-table-row:focus-visible {
+  outline: 2px solid color-mix(in srgb, var(--vlan-color, var(--device-accent)) 75%, transparent);
+  outline-offset: -2px;
+}
+
+/* =========================
+   WIRELESS BAND BUTTONS
+========================= */
+
+.wireless-band-buttons {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 8px;
+  margin-top: 10px;
+  padding-top: 10px;
+  border-top: 1px solid rgba(49, 68, 95, 0.45);
+}
+
+.wireless-band-btn {
+  min-height: 34px;
+  border: 1px solid rgba(49, 68, 95, 0.86);
+  border-radius: 9px;
+  background: rgba(2, 12, 27, 0.34);
+  color: var(--muted);
+  font-family: var(--mono);
+  font-size: 10px;
+  font-weight: 900;
+  letter-spacing: 0.04em;
+  cursor: pointer;
+  transition:
+    background 0.16s ease,
+    border-color 0.16s ease,
+    color 0.16s ease,
+    box-shadow 0.16s ease,
+    transform 0.16s ease;
+}
+
+.wireless-band-btn:hover {
+  transform: translateY(-1px);
+  color: var(--text);
+  border-color: color-mix(in srgb, var(--vlan-color, var(--device-accent)) 55%, var(--border2));
+  background: color-mix(in srgb, var(--vlan-color, var(--device-accent)) 8%, rgba(2, 12, 27, 0.5));
+}
+
+.wireless-band-btn.is-active {
+  color: var(--text);
+  border-color: color-mix(in srgb, var(--vlan-color, var(--device-accent)) 75%, var(--border2));
+  background: color-mix(in srgb, var(--vlan-color, var(--device-accent)) 18%, rgba(2, 12, 27, 0.58));
+  box-shadow:
+    inset 0 0 0 1px color-mix(in srgb, var(--vlan-color, var(--device-accent)) 25%, transparent),
+    0 0 14px color-mix(in srgb, var(--vlan-color, var(--device-accent)) 16%, transparent);
+}
+
+.wireless-band-btn.is-active:hover {
+  border-color: var(--vlan-color, var(--device-accent));
+  background: color-mix(in srgb, var(--vlan-color, var(--device-accent)) 24%, rgba(2, 12, 27, 0.62));
+  box-shadow:
+    inset 0 0 0 1px color-mix(in srgb, var(--vlan-color, var(--device-accent)) 32%, transparent),
+    0 0 18px color-mix(in srgb, var(--vlan-color, var(--device-accent)) 22%, transparent);
+}
+
+.wireless-band-btn:focus-visible {
+  outline: 2px solid color-mix(in srgb, var(--vlan-color, var(--device-accent)) 75%, transparent);
+  outline-offset: 2px;
+}
+
+/* =========================
+   CONNECTION MODAL POLISH
+========================= */
+
+.connection-modal-hint {
+  margin: 0 0 14px;
+  padding: 0;
+  color: var(--text);
+  font-family: var(--font-sans);
+  font-size: 15px;
+  font-weight: 500;
+  line-height: 1.28;
+  letter-spacing: 0;
+  max-width: 520px;
+}
+
+.connection-validation-message {
+  margin: 16px 0 18px;
+  padding: 12px 14px;
+  border: 1px solid rgba(100, 255, 218, 0.32);
+  border-radius: 10px;
+  background: rgba(100, 255, 218, 0.08);
+  color: var(--green);
+  font-family: var(--mono);
+  font-size: 14px;
+  font-weight: 800;
+  line-height: 1.25;
+}
+
+.connection-validation-message.warning {
+  margin-bottom: 20px;
+  border-color: rgba(255, 95, 122, 0.72);
+  background: rgba(255, 95, 122, 0.14);
+  color: #ff6b86;
+  box-shadow: 0 0 18px rgba(255, 95, 122, 0.10);
+}
+
+.connection-validation-message.warning + .row {
+  margin-top: 6px;
+}
+
+.modal .row {
+  align-items: flex-start;
+  gap: 10px;
+}
+
+.modal label {
+  margin-top: 10px;
+  margin-bottom: 6px;
+}
+
+.modal .connection-validation-message + .row label {
+  margin-top: 0;
+}
+
+#addConnectionBtn.disabled,
+#addConnectionBtn:disabled {
+  opacity: 0.55;
+  cursor: not-allowed;
+  box-shadow: none;
 }

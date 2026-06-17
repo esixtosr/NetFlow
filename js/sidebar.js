@@ -884,7 +884,7 @@ function renderWirelessBandButtons(device) {
   const bands = getWirelessBandState(device);
 
   return `
-    <div class="wireless-band-buttons">
+    <div class="wireless-band-buttons" style="display:grid;grid-template-columns:repeat(3,1fr);gap:14px;margin:14px 0 0;padding:0;border:0;">
       <button
         class="wireless-band-btn ${bands.ghz24 ? 'is-active' : ''}"
         onclick="toggleSelectedWirelessBand('ghz24')"
@@ -936,6 +936,7 @@ function toggleSelectedWirelessBand(bandKey) {
 function renderWirelessSsidProfileCard(device, zone) {
   const clientCount = getWirelessClientsForSsid(device).length;
   const managementIp = String(device && device.ipAddress ? device.ipAddress : '').trim();
+  const ipMode = getDeviceIpMode(device);
   const ssidVlanColor = zone && zone.color
     ? zone.color
     : getDeviceColor(device);
@@ -958,6 +959,13 @@ function renderWirelessSsidProfileCard(device, zone) {
       </div>
 
       <div class="details-meta-row">
+        <span>IP Mode</span>
+        <strong>${escapeHtml(formatIpModeLabel(ipMode))}</strong>
+      </div>
+
+      ${renderIpModeButtons(device)}
+
+      <div class="details-meta-row">
         <span>Subnet</span>
         <strong>${escapeHtml(zone ? getZoneDisplayValue(zone.subnet) : '—')}</strong>
       </div>
@@ -968,7 +976,7 @@ function renderWirelessSsidProfileCard(device, zone) {
       </div>
 
       <div class="details-meta-row">
-        <span>DHCP</span>
+        <span>VLAN DHCP</span>
         <strong>${escapeHtml(zone ? formatDhcpValue(zone.dhcp) : '—')}</strong>
       </div>
 
@@ -1153,6 +1161,91 @@ function getSuggestedIpForDevice(device, zone) {
   return '';
 }
 
+function getDeviceIpMode(device) {
+  if (!device) return 'dhcp';
+
+  const allowedModes = ['dhcp', 'static', 'reserved'];
+  const currentMode = String(device.ipMode || '').toLowerCase();
+
+  if (allowedModes.includes(currentMode)) {
+    return currentMode;
+  }
+
+  device.ipMode = String(device.ipAddress || '').trim() ? 'static' : 'dhcp';
+
+  return device.ipMode;
+}
+
+function formatIpModeLabel(value) {
+  const mode = String(value || 'dhcp').toLowerCase();
+
+  if (mode === 'static') return 'Static';
+  if (mode === 'reserved') return 'Reserved';
+
+  return 'DHCP';
+}
+
+function getNetworkProfileIpMode(device) {
+  const wirelessSsidDevice = getWirelessSsidForClient(device);
+
+  if (wirelessSsidDevice) {
+    return getDeviceIpMode(wirelessSsidDevice);
+  }
+
+  return 'dhcp';
+}
+
+function renderIpModeButtons(device) {
+  const mode = getDeviceIpMode(device);
+
+  return `
+    <div class="ip-mode-buttons" style="display:grid;grid-template-columns:repeat(3,1fr);gap:14px;margin:14px 0 10px;padding:0;border:0;">
+      <button
+        class="wireless-band-btn ip-mode-btn ${mode === 'dhcp' ? 'is-active' : ''}"
+        onclick="toggleSelectedDeviceIpMode('dhcp')"
+        type="button"
+      >
+        DHCP
+      </button>
+      <button
+        class="wireless-band-btn ip-mode-btn ${mode === 'static' ? 'is-active' : ''}"
+        onclick="toggleSelectedDeviceIpMode('static')"
+        type="button"
+      >
+        Static
+      </button>
+      <button
+        class="wireless-band-btn ip-mode-btn ${mode === 'reserved' ? 'is-active' : ''}"
+        onclick="toggleSelectedDeviceIpMode('reserved')"
+        type="button"
+      >
+        Reserved
+      </button>
+    </div>
+  `;
+}
+
+function toggleSelectedDeviceIpMode(mode) {
+  if (state.selectedType !== 'device') return;
+
+  const allowedModes = ['dhcp', 'static', 'reserved'];
+  const nextMode = String(mode || 'dhcp').toLowerCase();
+
+  if (!allowedModes.includes(nextMode)) return;
+
+  const device = state.devices.find(item => Number(item.id) === Number(state.selectedId));
+  if (!device) return;
+  pushHistory();
+
+  device.ipMode = nextMode;
+
+  markInspectorDirty();
+  renderDeviceDetailsPanel(device);
+  refreshSidebar();
+
+  setStatus('IP mode set to ' + formatIpModeLabel(nextMode) + ' for ' + (device.name || 'device'));
+}
+
 function getDeviceIpDisplay(device, zone) {
   const manualIp = String(device && device.ipAddress ? device.ipAddress : '').trim();
 
@@ -1168,7 +1261,7 @@ function getDeviceIpDisplay(device, zone) {
   if (suggestedIp) {
     return {
       value: suggestedIp,
-      source: 'Suggested'
+      source: 'DHCP'
     };
   }
 
@@ -1428,6 +1521,7 @@ function renderInheritedNetworkProfileCard(device, zone) {
   const showRestoreRememberedIpButton = Boolean(rememberedIp && currentIp !== rememberedIp);
   const showNetworkResetButton = shouldShowDeviceNetworkResetButton(device, zone, duplicateIp);
   const zoneSourceLabel = getDeviceZoneSourceLabel(device, zone);
+  const ipMode = getNetworkProfileIpMode(device);
 
   if (!zone) {
     return `
@@ -1498,6 +1592,11 @@ function renderInheritedNetworkProfileCard(device, zone) {
         <strong>${escapeHtml(getZoneDisplayValue(zone.subnet))}</strong>
       </div>
 
+      <div class="details-meta-row">
+        <span>IP Mode</span>
+        <strong>${escapeHtml(formatIpModeLabel(ipMode))}</strong>
+      </div>
+
       <div class="details-meta-row ip-address-row ${duplicateIp ? 'has-duplicate-ip' : ''}">
         <span>IP Address</span>
         <strong>
@@ -1509,13 +1608,13 @@ function renderInheritedNetworkProfileCard(device, zone) {
 
       ${renderDuplicateIpWarning(device, zone)}
 
-      ${ipDisplay.source === 'Suggested' ? `
+      ${ipDisplay.source === 'DHCP' ? `
         <button
           class="use-suggested-ip-btn"
           onclick="useSuggestedIpForSelectedDevice()"
           type="button"
         >
-          Use Suggested IP
+          Use DHCP IP
           <span>${escapeHtml(ipDisplay.value)}</span>
         </button>
       ` : ''}
@@ -1579,7 +1678,7 @@ function renderInheritedNetworkProfileCard(device, zone) {
       </div>
 
       <div class="details-meta-row">
-        <span>DHCP</span>
+        <span>VLAN DHCP</span>
         <strong>${escapeHtml(formatDhcpValue(zone.dhcp))}</strong>
       </div>
     </div>
@@ -1704,7 +1803,7 @@ function renderZoneDetailsPanel(zone) {
           <strong>${escapeHtml(getZoneDisplayValue(zone.dns))}</strong>
         </div>
         <div class="details-meta-row">
-          <span>DHCP</span>
+          <span>VLAN DHCP</span>
           <strong>${escapeHtml(formatDhcpValue(zone.dhcp))}</strong>
         </div>
         <div class="details-meta-row">

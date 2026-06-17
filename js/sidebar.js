@@ -441,6 +441,12 @@ function getRemotePortName(deviceId, portId) {
   return getPortDisplayName(port);
 }
 
+function formatStatusLabel(value) {
+  const cleanValue = String(value || 'online').trim();
+
+  return cleanValue ? cleanValue.toUpperCase() : 'ONLINE';
+}
+
 function getDevicePortConnections(device, port) {
   if (!device || !port) return [];
 
@@ -574,6 +580,24 @@ function sidebarIsNetworkInfrastructureDevice(device) {
   );
 }
 
+function sidebarIsWirelessSsidDevice(device) {
+  if (!device) return false;
+
+  const type = String(device.type || '').toLowerCase();
+  const name = String(device.name || '').toLowerCase();
+  const sub = String(device.sub || '').toLowerCase();
+
+  return (
+    type === 'wifi' ||
+    name.includes('ssid') ||
+    name.includes('wi-fi') ||
+    name.includes('wifi') ||
+    sub.includes('ssid') ||
+    sub.includes('wi-fi') ||
+    sub.includes('wifi')
+  );
+}
+
 function getConnectedDevicesForDevice(device) {
   if (!device) return [];
 
@@ -603,6 +627,90 @@ function getConnectedDevicesForDevice(device) {
   return devices;
 }
 
+function getWirelessClientsForSsid(device) {
+  if (!sidebarIsWirelessSsidDevice(device)) return [];
+
+  return getConnectedDevicesForDevice(device).filter(remoteDevice =>
+    remoteDevice &&
+    !sidebarIsNetworkInfrastructureDevice(remoteDevice) &&
+    !sidebarIsWirelessSsidDevice(remoteDevice)
+  );
+}
+
+function getWirelessSsidForClient(device) {
+  if (!device) return null;
+  if (sidebarIsWirelessSsidDevice(device)) return null;
+  if (sidebarIsNetworkInfrastructureDevice(device)) return null;
+
+  const deviceId = Number(device.id);
+
+  for (const connection of state.connections) {
+    const fromDevice = state.devices.find(item => Number(item.id) === Number(connection.from));
+    const toDevice = state.devices.find(item => Number(item.id) === Number(connection.to));
+
+    const fromIsClient = Number(connection.from) === deviceId;
+    const toIsClient = Number(connection.to) === deviceId;
+
+    if (!fromIsClient && !toIsClient) continue;
+
+    const remoteDevice = fromIsClient ? toDevice : fromDevice;
+
+    if (sidebarIsWirelessSsidDevice(remoteDevice)) {
+      return remoteDevice;
+    }
+  }
+
+  return null;
+}
+
+function getWirelessInheritedZone(device) {
+  const ssidDevice = getWirelessSsidForClient(device);
+
+  if (!ssidDevice) return null;
+
+  return getDeviceZone(ssidDevice);
+}
+
+function getEffectiveDeviceZone(device) {
+  if (!device) return null;
+
+  const physicalZone = getDeviceZone(device);
+
+  if (physicalZone) return physicalZone;
+
+  return getWirelessInheritedZone(device);
+}
+
+function getDeviceZoneSourceLabel(device, zone) {
+  if (!device || !zone) return '';
+
+  const physicalZone = getDeviceZone(device);
+
+  if (physicalZone && Number(physicalZone.id) === Number(zone.id)) {
+    return 'Physical VLAN zone';
+  }
+
+  const wirelessZone = getWirelessInheritedZone(device);
+
+  if (wirelessZone && Number(wirelessZone.id) === Number(zone.id)) {
+    const ssidDevice = getWirelessSsidForClient(device);
+    return 'Wireless via ' + (ssidDevice ? ssidDevice.name || 'SSID' : 'SSID');
+  }
+
+  return '';
+}
+
+function isZoneInheritedWirelessly(device, zone) {
+  const wirelessZone = getWirelessInheritedZone(device);
+
+  return Boolean(
+    wirelessZone &&
+    zone &&
+    Number(wirelessZone.id) === Number(zone.id) &&
+    !getDeviceZone(device)
+  );
+}
+
 function getAssignedVlansForNetworkDevice(device) {
   if (!device) return [];
 
@@ -610,7 +718,7 @@ function getAssignedVlansForNetworkDevice(device) {
   const vlanMap = new Map();
 
   connectedDevices.forEach(remoteDevice => {
-    const zone = getDeviceZone(remoteDevice);
+    const zone = getEffectiveDeviceZone(remoteDevice);
 
     if (!zone) return;
 
@@ -639,6 +747,252 @@ function renderAssignedVlanChips(device) {
           <span>${escapeHtml(zone.name || 'Unnamed VLAN')}</span>
         </div>
       `).join('')}
+    </div>
+  `;
+}
+
+function renderWirelessClientRows(device) {
+  if (!sidebarIsWirelessSsidDevice(device)) return '';
+
+  const ssidDeviceId = Number(device.id);
+  const ssidZone = getDeviceZone(device);
+  const ssidVlanColor = ssidZone && ssidZone.color
+    ? ssidZone.color
+    : getDeviceColor(device);
+
+  const clientConnections = state.connections
+    .map(connection => {
+      const fromIsSsid = Number(connection.from) === ssidDeviceId;
+      const toIsSsid = Number(connection.to) === ssidDeviceId;
+
+      if (!fromIsSsid && !toIsSsid) return null;
+
+      const clientDeviceId = fromIsSsid
+        ? Number(connection.to)
+        : Number(connection.from);
+
+      const ssidPortId = fromIsSsid
+        ? Number(connection.fromPort)
+        : Number(connection.toPort);
+
+      const clientPortId = fromIsSsid
+        ? Number(connection.toPort)
+        : Number(connection.fromPort);
+
+      const client = state.devices.find(item => Number(item.id) === clientDeviceId);
+
+      if (
+        !client ||
+        sidebarIsNetworkInfrastructureDevice(client) ||
+        sidebarIsWirelessSsidDevice(client)
+      ) {
+        return null;
+      }
+
+      return {
+        connection,
+        client,
+        ssidPortId,
+        clientPortId
+      };
+    })
+    .filter(Boolean);
+
+  if (!clientConnections.length) {
+    return `
+      <div class="ports-table-empty">
+        No wireless clients connected yet
+      </div>
+    `;
+  }
+
+  return `
+    <div class="ports-table wireless-clients-table" style="--device-accent:${ssidVlanColor}; --vlan-color:${ssidVlanColor};">
+      <div class="ports-table-header wireless-clients-header">
+        <div>Device</div>
+        <div>IP Address</div>
+        <div>Status</div>
+      </div>
+
+      ${clientConnections.map(item => {
+        const client = item.client;
+        const connection = item.connection;
+        const zone = getEffectiveDeviceZone(client) || ssidZone;
+        const ipDisplay = getDeviceIpDisplay(client, zone);
+
+        const rowHighlighted =
+          Number(state.highlightedConnectionId) === Number(connection.id);
+
+        return `
+          <button
+            class="ports-table-row wireless-client-table-row connected ${rowHighlighted ? 'is-highlighted' : ''}"
+            style="--device-accent:${ssidVlanColor}; --vlan-color:${ssidVlanColor};"
+            onclick="highlightPortConnection(${ssidDeviceId}, ${item.ssidPortId}, ${connection.id})"
+            type="button"
+          >
+            <div class="ports-table-cell connected-device">
+              <span class="ports-device-dot" style="background:${ssidVlanColor}"></span>
+              <span>${escapeHtml(client.name || 'Unnamed Device')}</span>
+            </div>
+            <div class="ports-table-cell">
+              ${escapeHtml(getZoneDisplayValue(ipDisplay.value))}
+            </div>
+            <div class="ports-table-cell status">${escapeHtml(formatStatusLabel(connection.status || client.status))}</div>
+          </button>
+        `;
+      }).join('')}
+    </div>
+  `;
+}
+
+function getWirelessBandState(device) {
+  if (!device) {
+    return {
+      ghz24: false,
+      ghz5: false,
+      ghz6: false
+    };
+  }
+
+  if (typeof ensureDeviceWirelessFields === 'function') {
+    ensureDeviceWirelessFields(device);
+  }
+
+  if (!device.wifiBands || typeof device.wifiBands !== 'object' || Array.isArray(device.wifiBands)) {
+    device.wifiBands = {
+      ghz24: true,
+      ghz5: true,
+      ghz6: false
+    };
+  }
+
+  return device.wifiBands;
+}
+
+function getWirelessBandSummary(device) {
+  const bands = getWirelessBandState(device);
+  const activeBands = [];
+
+  if (bands.ghz24) activeBands.push('2.4 GHz');
+  if (bands.ghz5) activeBands.push('5 GHz');
+  if (bands.ghz6) activeBands.push('6 GHz');
+
+  return activeBands.length ? activeBands.join(' · ') : 'No bands selected';
+}
+
+function renderWirelessBandButtons(device) {
+  const bands = getWirelessBandState(device);
+
+  return `
+    <div class="wireless-band-buttons">
+      <button
+        class="wireless-band-btn ${bands.ghz24 ? 'is-active' : ''}"
+        onclick="toggleSelectedWirelessBand('ghz24')"
+        type="button"
+      >
+        2.4 GHz
+      </button>
+      <button
+        class="wireless-band-btn ${bands.ghz5 ? 'is-active' : ''}"
+        onclick="toggleSelectedWirelessBand('ghz5')"
+        type="button"
+      >
+        5 GHz
+      </button>
+      <button
+        class="wireless-band-btn ${bands.ghz6 ? 'is-active' : ''}"
+        onclick="toggleSelectedWirelessBand('ghz6')"
+        type="button"
+      >
+        6 GHz
+      </button>
+    </div>
+  `;
+}
+
+function toggleSelectedWirelessBand(bandKey) {
+  if (state.selectedType !== 'device') return;
+
+  const device = state.devices.find(item => Number(item.id) === Number(state.selectedId));
+
+  if (!sidebarIsWirelessSsidDevice(device)) return;
+
+  const allowedBands = ['ghz24', 'ghz5', 'ghz6'];
+
+  if (!allowedBands.includes(bandKey)) return;
+
+  pushHistory();
+
+  const bands = getWirelessBandState(device);
+  bands[bandKey] = !bands[bandKey];
+
+  markInspectorDirty();
+  renderDeviceDetailsPanel(device);
+  refreshSidebar();
+
+  setStatus('Updated wireless bands for ' + (device.name || 'SSID'));
+}
+
+function renderWirelessSsidProfileCard(device, zone) {
+  const clientCount = getWirelessClientsForSsid(device).length;
+  const managementIp = String(device && device.ipAddress ? device.ipAddress : '').trim();
+  const ssidVlanColor = zone && zone.color
+    ? zone.color
+    : getDeviceColor(device);
+
+  return `
+    <div class="details-meta-card wireless-ssid-profile-card">
+      <div class="assigned-vlan-title">Wireless / SSID Profile</div>
+      <div class="assigned-vlan-sub">
+        SSIDs broadcast VLAN access. They do not receive endpoint IP suggestions.
+      </div>
+
+      <div class="details-meta-row" style="margin-top:10px;">
+        <span>Broadcast VLAN</span>
+        <strong>${escapeHtml(zone ? zone.name || 'Unnamed VLAN' : 'No VLAN zone detected')}</strong>
+      </div>
+
+      <div class="details-meta-row">
+        <span>Management IP</span>
+        <strong>${escapeHtml(managementIp || 'Manual only')}</strong>
+      </div>
+
+      <div class="details-meta-row">
+        <span>Subnet</span>
+        <strong>${escapeHtml(zone ? getZoneDisplayValue(zone.subnet) : '—')}</strong>
+      </div>
+
+      <div class="details-meta-row">
+        <span>Gateway</span>
+        <strong>${escapeHtml(zone ? getZoneDisplayValue(zone.gateway) : '—')}</strong>
+      </div>
+
+      <div class="details-meta-row">
+        <span>DHCP</span>
+        <strong>${escapeHtml(zone ? formatDhcpValue(zone.dhcp) : '—')}</strong>
+      </div>
+
+      <div class="details-meta-row">
+        <span>Wireless Bands</span>
+        <strong>${escapeHtml(getWirelessBandSummary(device))}</strong>
+      </div>
+
+      ${renderWirelessBandButtons(device)}
+    </div>
+
+    <div class="details-meta-card wireless-clients-card" style="--device-accent:${ssidVlanColor}; --vlan-color:${ssidVlanColor};">
+      <div class="ports-section-head">
+        <div>
+          <div class="ports-section-title">Wireless Clients</div>
+          <div class="ports-section-sub">
+            ${clientCount
+              ? clientCount + ' connected client' + (clientCount === 1 ? '' : 's')
+              : 'Devices connected to this SSID inherit the SSID VLAN'}
+          </div>
+        </div>
+      </div>
+
+      ${renderWirelessClientRows(device)}
     </div>
   `;
 }
@@ -724,7 +1078,7 @@ function getManualIpsInZone(zone, excludeDeviceId = null) {
       return;
     }
 
-    const deviceZone = getDeviceZone(device);
+    const deviceZone = getEffectiveDeviceZone(device);
 
     if (!deviceZone || Number(deviceZone.id) !== Number(zone.id)) {
       return;
@@ -752,10 +1106,11 @@ function getSuggestedIpForDevice(device, zone) {
 
   const devicesInZone = state.devices
     .filter(item => {
-      const itemZone = getDeviceZone(item);
+      const itemZone = getEffectiveDeviceZone(item);
       return itemZone && Number(itemZone.id) === Number(zone.id);
     })
     .filter(item => !sidebarIsNetworkInfrastructureDevice(item))
+    .filter(item => !sidebarIsWirelessSsidDevice(item))
     .sort((a, b) => Number(a.id) - Number(b.id));
 
   const deviceIndex = Math.max(
@@ -822,6 +1177,24 @@ function getDeviceIpDisplay(device, zone) {
     source: ''
   };
 }
+
+function shouldShowDeviceNetworkResetButton(device, zone, duplicateIp = false) {
+  if (!device || !zone) return false;
+
+  const currentIp = String(device.ipAddress || '').trim();
+  const rememberedIp = getRememberedIpForDevice(device, zone);
+  const suggestedIp = getSuggestedIpForDevice(device, zone);
+  const gatewayOverride = String(device.gatewayOverride || '').trim();
+  const dnsOverride = String(device.dnsOverride || '').trim();
+
+  if (duplicateIp) return true;
+  if (gatewayOverride || dnsOverride) return true;
+  if (!currentIp) return false;
+  if (rememberedIp && currentIp === rememberedIp) return false;
+  if (suggestedIp && currentIp === suggestedIp && !rememberedIp) return false;
+
+  return Boolean(suggestedIp && currentIp !== suggestedIp);
+}
 /* =========================
    PHASE 7.5 — PER-VLAN IP MEMORY
 ========================= */
@@ -884,7 +1257,7 @@ function saveSelectedDeviceIpToVlanMemory() {
   const device = state.devices.find(item => Number(item.id) === Number(state.selectedId));
   if (!device) return;
 
-  const zone = getDeviceZone(device);
+  const zone = getEffectiveDeviceZone(device);
 
   if (!zone) {
     setStatus('⚠ Device is not inside a VLAN zone');
@@ -892,6 +1265,12 @@ function saveSelectedDeviceIpToVlanMemory() {
   }
 
   const currentIp = String(device.ipAddress || '').trim();
+
+  if (hasDuplicateIp(device, zone)) {
+    setStatus('⚠ Fix duplicate IP before remembering it for this VLAN');
+    renderDeviceDetailsPanel(device);
+    return;
+  }
 
   if (!currentIp) {
     setStatus('⚠ Add a Manual IP before saving it to this VLAN');
@@ -914,7 +1293,7 @@ function restoreRememberedIpForSelectedDevice() {
   const device = state.devices.find(item => Number(item.id) === Number(state.selectedId));
   if (!device) return;
 
-  const zone = getDeviceZone(device);
+  const zone = getEffectiveDeviceZone(device);
 
   if (!zone) {
     setStatus('⚠ Device is not inside a VLAN zone');
@@ -954,7 +1333,7 @@ function getDuplicateIpDevices(device, zone) {
       return false;
     }
 
-    const otherZone = getDeviceZone(otherDevice);
+    const otherZone = getEffectiveDeviceZone(otherDevice);
 
     if (!otherZone || Number(otherZone.id) !== Number(zone.id)) {
       return false;
@@ -1044,6 +1423,11 @@ function renderInheritedNetworkProfileCard(device, zone) {
   const ipDisplay = getDeviceIpDisplay(device, zone);
   const duplicateIp = hasDuplicateIp(device, zone);
   const rememberedIp = getRememberedIpForDevice(device, zone);
+  const currentIp = String(device && device.ipAddress ? device.ipAddress : '').trim();
+  const showRememberIpButton = Boolean(currentIp && currentIp !== rememberedIp && !duplicateIp);
+  const showRestoreRememberedIpButton = Boolean(rememberedIp && currentIp !== rememberedIp);
+  const showNetworkResetButton = shouldShowDeviceNetworkResetButton(device, zone, duplicateIp);
+  const zoneSourceLabel = getDeviceZoneSourceLabel(device, zone);
 
   if (!zone) {
     return `
@@ -1097,6 +1481,13 @@ function renderInheritedNetworkProfileCard(device, zone) {
         <strong>${escapeHtml(zone.name || 'Unnamed VLAN')}</strong>
       </div>
 
+      ${zoneSourceLabel ? `
+        <div class="details-meta-row">
+          <span>Inherited By</span>
+          <strong>${escapeHtml(zoneSourceLabel)}</strong>
+        </div>
+      ` : ''}
+
       <div class="details-meta-row">
         <span>VLAN ID</span>
         <strong>${escapeHtml(getZoneDisplayValue(zone.vlanId))}</strong>
@@ -1129,14 +1520,14 @@ function renderInheritedNetworkProfileCard(device, zone) {
         </button>
       ` : ''}
 
-      ${device && device.ipAddress ? `
+      ${showRememberIpButton ? `
         <button
           class="remember-ip-btn"
           onclick="saveSelectedDeviceIpToVlanMemory()"
           type="button"
         >
           Remember IP for this VLAN
-          <span>${escapeHtml(device.ipAddress)}</span>
+          <span>${escapeHtml(currentIp)}</span>
         </button>
       ` : ''}
 
@@ -1149,7 +1540,7 @@ function renderInheritedNetworkProfileCard(device, zone) {
           </strong>
         </div>
 
-        ${String(device.ipAddress || '').trim() !== rememberedIp ? `
+        ${showRestoreRememberedIpButton ? `
           <button
             class="restore-remembered-ip-btn"
             onclick="restoreRememberedIpForSelectedDevice()"
@@ -1159,6 +1550,16 @@ function renderInheritedNetworkProfileCard(device, zone) {
             <span>${escapeHtml(rememberedIp)}</span>
           </button>
         ` : ''}
+      ` : ''}
+
+      ${showNetworkResetButton ? `
+        <button
+          class="inherited-network-reset-btn right-panel-reset-btn"
+          onclick="resetSelectedDeviceNetworkOverride()"
+          type="button"
+        >
+          Reset to Inherited Network
+        </button>
       ` : ''}
 
       <div class="details-meta-row">
@@ -1186,13 +1587,43 @@ function renderInheritedNetworkProfileCard(device, zone) {
 }
 
 function renderDeviceNetworkMetaCard(device, zone) {
+  const isWirelessSsid = sidebarIsWirelessSsidDevice(device);
   const isNetworkDevice = sidebarIsNetworkInfrastructureDevice(device);
+
+  if (isWirelessSsid) {
+    return renderWirelessSsidProfileCard(device, zone);
+  }
 
   if (isNetworkDevice) {
     const assignedCount = getAssignedVlansForNetworkDevice(device).length;
+    const zoneName = zone ? zone.name || 'Unnamed VLAN' : 'No VLAN zone detected';
+    const managementIp = String(device && device.ipAddress ? device.ipAddress : '').trim();
 
     return `
-      ${renderInheritedNetworkProfileCard(device, zone)}
+      <div class="details-meta-card network-infra-profile-card">
+        <div class="assigned-vlan-title">Network Device Profile</div>
+        <div class="assigned-vlan-sub">
+          Uses manual management settings and does not receive endpoint VLAN IP suggestions.
+        </div>
+
+        <div class="details-meta-row" style="margin-top:10px;">
+          <span>Current Zone</span>
+          <strong>${escapeHtml(zoneName)}</strong>
+        </div>
+
+        <div class="details-meta-row">
+          <span>Management IP</span>
+          <strong>
+            ${escapeHtml(managementIp || 'Manual only')}
+            ${managementIp ? renderNetworkBadge('Manual') : ''}
+          </strong>
+        </div>
+
+        <div class="details-meta-row">
+          <span>VLAN Role</span>
+          <strong>Carries or connects VLAN traffic</strong>
+        </div>
+      </div>
 
       <div class="details-meta-card assigned-vlan-card">
         <div class="assigned-vlan-head">
@@ -1410,7 +1841,7 @@ function renderDevicePortRows(device) {
             <span>${escapeHtml(item.remoteDevice ? item.remoteDevice.name : 'Missing device')}</span>
           </div>
           <div class="ports-table-cell">${escapeHtml(item.remotePortName || 'Port')}</div>
-          <div class="ports-table-cell status">${escapeHtml(item.connection.status || 'online')}</div>
+          <div class="ports-table-cell status">${escapeHtml(formatStatusLabel(item.connection.status))}</div>
         </button>
       `;
     }).join('');
@@ -1425,6 +1856,38 @@ function getHighlightedConnection() {
   );
 }
 
+function getWirelessConnectionDetails(connection) {
+  if (!connection) return null;
+
+  const fromDevice = state.devices.find(device => Number(device.id) === Number(connection.from));
+  const toDevice = state.devices.find(device => Number(device.id) === Number(connection.to));
+
+  const fromIsSsid = sidebarIsWirelessSsidDevice(fromDevice);
+  const toIsSsid = sidebarIsWirelessSsidDevice(toDevice);
+
+  if (!fromIsSsid && !toIsSsid) return null;
+
+  const ssidDevice = fromIsSsid ? fromDevice : toDevice;
+  const clientDevice = fromIsSsid ? toDevice : fromDevice;
+  const ssidPort = fromIsSsid
+    ? getRemotePortName(connection.from, connection.fromPort)
+    : getRemotePortName(connection.to, connection.toPort);
+  const clientPort = fromIsSsid
+    ? getRemotePortName(connection.to, connection.toPort)
+    : getRemotePortName(connection.from, connection.fromPort);
+
+  return {
+    ssidDevice,
+    clientDevice,
+    ssidPort,
+    clientPort
+  };
+}
+
+function isWirelessConnection(connection) {
+  return Boolean(getWirelessConnectionDetails(connection));
+}
+
 function renderHighlightedConnectionCard(connection) {
   if (!connection) return '';
 
@@ -1434,6 +1897,54 @@ function renderHighlightedConnectionCard(connection) {
   const fromPort = getRemotePortName(connection.from, connection.fromPort);
   const toPort = getRemotePortName(connection.to, connection.toPort);
   const color = getConnectionColor(connection);
+  const wirelessDetails = getWirelessConnectionDetails(connection);
+
+  if (wirelessDetails) {
+    return `
+      <div class="inline-connection-card wireless-association-card" style="--device-accent:${color}; --vlan-color:${color};">
+        <div class="inline-connection-head">
+          <div class="inline-connection-icon">
+            ${getDetailsDeviceIconSvg(wirelessDetails.ssidDevice)}
+          </div>
+          <div>
+            <div class="details-eyebrow">Wireless Association</div>
+            <div class="inline-connection-title">
+              ${escapeHtml(wirelessDetails.ssidDevice ? wirelessDetails.ssidDevice.name : 'Missing SSID')}
+              <span>↔</span>
+              ${escapeHtml(wirelessDetails.clientDevice ? wirelessDetails.clientDevice.name : 'Missing Client')}
+            </div>
+          </div>
+        </div>
+
+        <div class="inline-connection-grid">
+          <div>
+            <span>SSID</span>
+            <strong>${escapeHtml(wirelessDetails.ssidDevice ? wirelessDetails.ssidDevice.name : 'Missing SSID')}</strong>
+          </div>
+          <div>
+            <span>Client</span>
+            <strong>${escapeHtml(wirelessDetails.clientDevice ? wirelessDetails.clientDevice.name : 'Missing Client')}</strong>
+          </div>
+          <div>
+            <span>Status</span>
+            <strong>${escapeHtml(formatStatusLabel(connection.status))}</strong>
+          </div>
+          <div>
+            <span>Connection</span>
+            <strong>Wireless</strong>
+          </div>
+          <div>
+            <span>SSID Link</span>
+            <strong>${escapeHtml(wirelessDetails.ssidPort || 'Wireless')}</strong>
+          </div>
+          <div>
+            <span>Client Link</span>
+            <strong>${escapeHtml(wirelessDetails.clientPort || 'Wireless')}</strong>
+          </div>
+        </div>
+      </div>
+    `;
+  }
 
   return `
     <div class="inline-connection-card" style="--device-accent:${color}">
@@ -1462,7 +1973,7 @@ function renderHighlightedConnectionCard(connection) {
         </div>
         <div>
           <span>Status</span>
-          <strong>${escapeHtml(connection.status || 'online')}</strong>
+          <strong>${escapeHtml(formatStatusLabel(connection.status))}</strong>
         </div>
         <div>
           <span>Style</span>
@@ -1588,8 +2099,10 @@ function getDetailsDeviceIconSvg(device) {
     'wifi': `
       <svg class="details-device-svg" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.1" stroke-linecap="round" stroke-linejoin="round">
         <path stroke="none" d="M0 0h24v24H0z" fill="none"/>
-        <path d="M5 13a10 10 0 0 1 14 0"/>
-        <path d="M8.5 16.5a5 5 0 0 1 7 0"/>
+        <path d="M3.5 9.5a12 12 0 0 1 17 0"/>
+        <path d="M5.25 12.25a9.5 9.5 0 0 1 13.5 0"/>
+        <path d="M7.75 15a6 6 0 0 1 8.5 0"/>
+        <path d="M10.25 17.75a2.5 2.5 0 0 1 3.5 0"/>
         <path d="M12 20h.01"/>
       </svg>
     `,
@@ -1638,7 +2151,7 @@ function renderDeviceDetailsPanel(device) {
   const portCount = getSafePortCount(device);
   const connectionCount = getDeviceConnectionCount(device);
   const typeLabel = TYPE_LABEL[device.type] || device.type || 'Device';
-  const zone = getDeviceZone(device);
+  const zone = getEffectiveDeviceZone(device);
   const highlightedConnection = getHighlightedConnection();
 
   const rows = renderDevicePortRows(device);
@@ -1666,7 +2179,7 @@ function renderDeviceDetailsPanel(device) {
         </div>
         <div class="details-stat">
           <span>Status</span>
-          <strong>${escapeHtml(device.status || 'online')}</strong>
+          <strong>${escapeHtml(formatStatusLabel(device.status))}</strong>
         </div>
         <div class="details-stat">
           <span>Ports</span>
@@ -1725,6 +2238,53 @@ function renderConnectionDetailsPanel(connection) {
   const fromPort = getRemotePortName(connection.from, connection.fromPort);
   const toPort = getRemotePortName(connection.to, connection.toPort);
   const color = getConnectionColor(connection);
+  const wirelessDetails = getWirelessConnectionDetails(connection);
+
+  if (wirelessDetails) {
+    panel.innerHTML = `
+      <div class="details-inspector" style="--device-accent:${color}; --vlan-color:${color};">
+        <div class="details-device-header">
+          <div class="details-device-icon line-icon" style="border-color:${color}; color:${color}">
+            ${getDetailsDeviceIconSvg(wirelessDetails.ssidDevice)}
+          </div>
+
+          <div class="details-device-main">
+            <div class="details-eyebrow">Selected Wireless Association</div>
+            <div class="details-device-name">${escapeHtml(wirelessDetails.ssidDevice ? wirelessDetails.ssidDevice.name : 'Missing SSID')}</div>
+            <div class="details-device-sub">client ${escapeHtml(wirelessDetails.clientDevice ? wirelessDetails.clientDevice.name : 'Missing Client')}</div>
+          </div>
+        </div>
+
+        <div class="details-meta-card wireless-association-card">
+          <div class="details-meta-row">
+            <span>SSID</span>
+            <strong>${escapeHtml(wirelessDetails.ssidDevice ? wirelessDetails.ssidDevice.name : 'Missing SSID')}</strong>
+          </div>
+          <div class="details-meta-row">
+            <span>Client</span>
+            <strong>${escapeHtml(wirelessDetails.clientDevice ? wirelessDetails.clientDevice.name : 'Missing Client')}</strong>
+          </div>
+          <div class="details-meta-row">
+            <span>Connection Type</span>
+            <strong>Wireless Association</strong>
+          </div>
+          <div class="details-meta-row">
+            <span>Status</span>
+            <strong>${escapeHtml(formatStatusLabel(connection.status))}</strong>
+          </div>
+          <div class="details-meta-row">
+            <span>SSID Link</span>
+            <strong>${escapeHtml(wirelessDetails.ssidPort || 'Wireless')}</strong>
+          </div>
+          <div class="details-meta-row">
+            <span>Client Link</span>
+            <strong>${escapeHtml(wirelessDetails.clientPort || 'Wireless')}</strong>
+          </div>
+        </div>
+      </div>
+    `;
+    return;
+  }
 
   panel.innerHTML = `
     <div class="details-inspector" style="--device-accent:${color}">
@@ -1751,7 +2311,7 @@ function renderConnectionDetailsPanel(connection) {
         </div>
         <div class="details-meta-row">
           <span>Status</span>
-          <strong>${escapeHtml(connection.status || 'online')}</strong>
+          <strong>${escapeHtml(formatStatusLabel(connection.status))}</strong>
         </div>
         <div class="details-meta-row">
           <span>Style</span>
@@ -1811,8 +2371,10 @@ function renderActiveDetailsPanel() {
 
 function deviceHasIpConflict(device) {
   if (!device) return false;
+  if (sidebarIsWirelessSsidDevice(device)) return false;
+  if (sidebarIsNetworkInfrastructureDevice(device)) return false;
 
-  const zone = getDeviceZone(device);
+  const zone = getEffectiveDeviceZone(device);
 
   if (!zone) return false;
 
@@ -1840,8 +2402,10 @@ function renderDeviceItem(device) {
   };
 
   const rightIconText = device.iconRight ? ' · 2 ICONS' : '';
-  const zone = getDeviceZone(device);
-  const zoneText = zone ? ' · ' + zone.name.toUpperCase() : '';
+  const zone = getEffectiveDeviceZone(device);
+  const zoneText = zone
+    ? ' · ' + zone.name.toUpperCase() + (isZoneInheritedWirelessly(device, zone) ? ' VIA WIFI' : '')
+    : '';
   const portCount = getSafePortCount(device);
   const portText = ' · ' + portCount + ' port' + (portCount === 1 ? '' : 's');
   const ipText = device.ipAddress ? ' · ' + device.ipAddress : '';
@@ -1855,7 +2419,7 @@ function renderDeviceItem(device) {
         ${ipConflict ? '<span class="sidebar-conflict-badge">Conflict</span>' : ''}
       </div>
       <div class="item-sub">
-        ${escapeHtml(TYPE_LABEL[device.type] || device.type)}${portText}${rightIconText}${zoneText}${ipText}${conflictText} · ${escapeHtml(device.status)}
+        ${escapeHtml(TYPE_LABEL[device.type] || device.type)}${portText}${rightIconText}${zoneText}${ipText}${conflictText} · ${escapeHtml(formatStatusLabel(device.status))}
       </div>
     </div>
     <button class="delete-mini" onclick="event.stopPropagation();removeDevice(${device.id})">×</button>
@@ -2378,8 +2942,8 @@ function useSuggestedIpForSelectedDevice() {
   const device = state.devices.find(item => Number(item.id) === Number(state.selectedId));
   if (!device) return;
 
-  const zone = getDeviceZone(device);
-
+  const zone = getEffectiveDeviceZone(device);
+  
   if (!zone) {
     setStatus('⚠ Device is not inside a VLAN zone');
     return;
@@ -2409,17 +2973,24 @@ function useSuggestedIpForSelectedDevice() {
 function resetSelectedDeviceNetworkOverride() {
   if (state.selectedType !== 'device') return;
 
-  pushHistory();
-
-  const device = state.devices.find(item => item.id === state.selectedId);
+  const device = state.devices.find(item => Number(item.id) === Number(state.selectedId));
   if (!device) return;
+
+  const zone = getEffectiveDeviceZone(device);
+  const suggestedIp = zone ? getSuggestedIpForDevice(device, zone) : '';
+
+  pushHistory();
 
   device.ipAddress = '';
   device.gatewayOverride = '';
   device.dnsOverride = '';
 
+  if (suggestedIp) {
+    device.ipAddress = suggestedIp;
+  }
+
   if (typeof propDeviceIp !== 'undefined' && propDeviceIp) {
-    propDeviceIp.value = '';
+    propDeviceIp.value = device.ipAddress || '';
   }
 
   if (typeof propDeviceGateway !== 'undefined' && propDeviceGateway) {
@@ -2433,7 +3004,11 @@ function resetSelectedDeviceNetworkOverride() {
   renderDeviceDetailsPanel(device);
   refreshSidebar();
 
-  setStatus('Manual network override reset for ' + device.name);
+  if (suggestedIp) {
+    setStatus('Reset network override and assigned suggested IP ' + suggestedIp + ' to ' + device.name);
+  } else {
+    setStatus('Manual network override reset for ' + device.name);
+  }
 }
 function startPacketAnimation() {
   state.animationMode = 'running';

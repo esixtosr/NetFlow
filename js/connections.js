@@ -1,31 +1,219 @@
 function getConnectionColor(c) {
-  if (c.status && c.status !== 'online') {
-    return STATUS_COLOR[c.status] || '#ffffff';
+  const status = String(c.status || 'online').toLowerCase();
+
+  if (status !== 'online') {
+    return STATUS_COLOR[status] || '#ffffff';
   }
 
-  const a = state.devices.find(d => d.id === c.from);
-  const b = state.devices.find(d => d.id === c.to);
+  const a = state.devices.find(d => Number(d.id) === Number(c.from));
+  const b = state.devices.find(d => Number(d.id) === Number(c.to));
 
   if (!a && !b) return '#ffffff';
   if (a && !b) return getDeviceColor(a);
   if (!a && b) return getDeviceColor(b);
 
-  const za = getDeviceZone(a);
-  const zb = getDeviceZone(b);
+  const za = typeof getEffectiveCanvasDeviceZone === 'function'
+    ? getEffectiveCanvasDeviceZone(a)
+    : getDeviceZone(a);
+
+  const zb = typeof getEffectiveCanvasDeviceZone === 'function'
+    ? getEffectiveCanvasDeviceZone(b)
+    : getDeviceZone(b);
 
   if (za && zb) {
-    if (za.id === zb.id) return za.color;
-    return a.id > b.id ? za.color : zb.color;
+    if (Number(za.id) === Number(zb.id)) return za.color;
+    return Number(a.id) > Number(b.id) ? za.color : zb.color;
   }
 
   if (za && !zb) return za.color;
   if (!za && zb) return zb.color;
 
-  return a.id > b.id ? getDeviceColor(a) : getDeviceColor(b);
+  return Number(a.id) > Number(b.id) ? getDeviceColor(a) : getDeviceColor(b);
 }
 
 function getDeviceById(deviceId) {
   return state.devices.find(d => d.id === Number(deviceId));
+}
+
+function isConnectionWirelessSsidDevice(device) {
+  if (!device) return false;
+
+  const type = String(device.type || '').toLowerCase();
+  const name = String(device.name || '').toLowerCase();
+  const sub = String(device.sub || '').toLowerCase();
+
+  return (
+    type === 'wifi' ||
+    name.includes('ssid') ||
+    name.includes('wi-fi') ||
+    name.includes('wifi') ||
+    sub.includes('ssid') ||
+    sub.includes('wi-fi') ||
+    sub.includes('wifi')
+  );
+}
+
+function isConnectionNetworkInfrastructureDevice(device) {
+  if (!device) return false;
+
+  const type = String(device.type || '').toLowerCase();
+  const name = String(device.name || '').toLowerCase();
+  const sub = String(device.sub || '').toLowerCase();
+
+  return (
+    type === 'router' ||
+    type === 'firewall' ||
+    type === 'switch' ||
+    type === 'ap' ||
+    type === 'cloud' ||
+    type === 'gateway' ||
+    name.includes('router') ||
+    name.includes('firewall') ||
+    name.includes('switch') ||
+    name.includes('gateway') ||
+    name.includes('cloud') ||
+    name.includes('wan') ||
+    name.includes('internet') ||
+    name.includes('access point') ||
+    name.includes(' ap') ||
+    name.includes('unifi') ||
+    name.includes('proxmox') ||
+    name.includes('vm host') ||
+    name.includes('hypervisor') ||
+    sub.includes('router') ||
+    sub.includes('firewall') ||
+    sub.includes('switch') ||
+    sub.includes('gateway') ||
+    sub.includes('cloud') ||
+    sub.includes('wan') ||
+    sub.includes('internet') ||
+    sub.includes('access point') ||
+    sub.includes('unifi') ||
+    sub.includes('proxmox') ||
+    sub.includes('vm host') ||
+    sub.includes('hypervisor')
+  );
+}
+
+function isConnectionWirelessClientDevice(device) {
+  if (!device) return false;
+  if (isConnectionWirelessSsidDevice(device)) return false;
+  if (isConnectionNetworkInfrastructureDevice(device)) return false;
+
+  return true;
+}
+
+
+function getWirelessAssociationDetails(from, to) {
+  const fromDevice = getDeviceById(from);
+  const toDevice = getDeviceById(to);
+
+  const fromIsSsid = isConnectionWirelessSsidDevice(fromDevice);
+  const toIsSsid = isConnectionWirelessSsidDevice(toDevice);
+
+  if (fromIsSsid === toIsSsid) return null;
+
+  const ssidDevice = fromIsSsid ? fromDevice : toDevice;
+  const clientDevice = fromIsSsid ? toDevice : fromDevice;
+
+  if (!isConnectionWirelessClientDevice(clientDevice)) return null;
+
+  return {
+    ssidDevice,
+    clientDevice
+  };
+}
+
+
+function updateConnectionModalLabels(from, to) {
+  const wirelessAssociation = getWirelessAssociationDetails(from, to);
+  const modalTitle = document.getElementById('connectionModalTitle');
+  const modalHint = document.getElementById('connectionModalHint');
+  const addButton = document.getElementById('addConnectionBtn');
+  const fromLabel = document.getElementById('connFromLabel');
+  const fromPortLabel = document.getElementById('connFromPortLabel');
+  const toLabel = document.getElementById('connToLabel');
+  const toPortLabel = document.getElementById('connToPortLabel');
+
+  if (!wirelessAssociation) {
+    if (modalTitle) modalTitle.textContent = 'Add Connection';
+    if (modalHint) {
+      modalHint.textContent = 'Select two devices to create a wired connection or wireless association.';
+    }
+    if (addButton) addButton.textContent = 'Add';
+    if (fromLabel) fromLabel.textContent = 'From Device';
+    if (fromPortLabel) fromPortLabel.textContent = 'From Port';
+    if (toLabel) toLabel.textContent = 'To Device';
+    if (toPortLabel) toPortLabel.textContent = 'To Port';
+    return;
+  }
+
+  const fromDevice = getDeviceById(from);
+  const fromIsSsid = isConnectionWirelessSsidDevice(fromDevice);
+
+  if (modalTitle) modalTitle.textContent = 'Add Wireless Association';
+  if (modalHint) {
+    modalHint.textContent = 'Connect a wireless client to an SSID. SSID links can support multiple clients.';
+  }
+  if (addButton) addButton.textContent = 'Add Wireless Association';
+
+  if (fromLabel) fromLabel.textContent = fromIsSsid ? 'SSID' : 'Wireless Client';
+  if (fromPortLabel) fromPortLabel.textContent = fromIsSsid ? 'SSID Link' : 'Client Link';
+  if (toLabel) toLabel.textContent = fromIsSsid ? 'Wireless Client' : 'SSID';
+  if (toPortLabel) toPortLabel.textContent = fromIsSsid ? 'Client Link' : 'SSID Link';
+}
+
+function updateSelectedConnectionLabels(connection) {
+  const wirelessAssociation = getWirelessAssociationDetails(
+    connection ? connection.from : null,
+    connection ? connection.to : null
+  );
+
+  const fromLabel = document.getElementById('propConnFromLabel');
+  const fromPortLabel = document.getElementById('propConnFromPortLabel');
+  const toLabel = document.getElementById('propConnToLabel');
+  const toPortLabel = document.getElementById('propConnToPortLabel');
+
+  if (!wirelessAssociation || !connection) {
+    if (fromLabel) fromLabel.textContent = 'From Device';
+    if (fromPortLabel) fromPortLabel.textContent = 'From Port';
+    if (toLabel) toLabel.textContent = 'To Device';
+    if (toPortLabel) toPortLabel.textContent = 'To Port';
+    return;
+  }
+
+  const fromDevice = getDeviceById(connection.from);
+  const fromIsSsid = isConnectionWirelessSsidDevice(fromDevice);
+
+  if (fromLabel) fromLabel.textContent = fromIsSsid ? 'SSID' : 'Wireless Client';
+  if (fromPortLabel) fromPortLabel.textContent = fromIsSsid ? 'SSID Link' : 'Client Link';
+  if (toLabel) toLabel.textContent = fromIsSsid ? 'Wireless Client' : 'SSID';
+  if (toPortLabel) toPortLabel.textContent = fromIsSsid ? 'Client Link' : 'SSID Link';
+}
+
+
+function connectionInvolvesWirelessSsid(from, to) {
+  return Boolean(getWirelessAssociationDetails(from, to));
+}
+
+function applyWirelessConnectionDefaults(from, to) {
+  if (!connectionInvolvesWirelessSsid(from, to)) return;
+
+  if (typeof connStyle !== 'undefined' && connStyle) {
+    connStyle.value = 'dashed';
+  }
+
+  if (typeof connShape !== 'undefined' && connShape && !connShape.value) {
+    connShape.value = 'smart';
+  }
+}
+
+function getConnectionStyleValue(from, to, requestedStyle) {
+  if (connectionInvolvesWirelessSsid(from, to)) {
+    return 'dashed';
+  }
+
+  return requestedStyle || 'solid';
 }
 
 function getDevicePorts(deviceId) {
@@ -81,8 +269,10 @@ function getUsedPortConnectionCount(deviceId, portId, ignoreConnectionId = null)
 
 function isPortAvailable(deviceId, portId, ignoreConnectionId = null) {
   const port = getPortById(deviceId, portId);
+  const device = getDeviceById(deviceId);
 
   if (!port) return false;
+  if (isConnectionWirelessSsidDevice(device)) return true;
   if (isReusablePort(port)) return true;
 
   return getUsedPortConnectionCount(deviceId, portId, ignoreConnectionId) === 0;
@@ -114,6 +304,7 @@ function isSameConnectionPair(connection, from, fromPort, to, toPort) {
   return sameDirection || reverseDirection;
 }
 
+
 function connectionPairExists(from, fromPort, to, toPort, ignoreConnectionId = null) {
   return state.connections.some(connection => {
     if (ignoreConnectionId && connection.id === ignoreConnectionId) {
@@ -124,10 +315,33 @@ function connectionPairExists(from, fromPort, to, toPort, ignoreConnectionId = n
   });
 }
 
+function wirelessClientAssociationExists(clientDeviceId, ignoreConnectionId = null) {
+  const clientId = Number(clientDeviceId);
+
+  return state.connections.some(connection => {
+    if (ignoreConnectionId && Number(connection.id) === Number(ignoreConnectionId)) {
+      return false;
+    }
+
+    const details = getWirelessAssociationDetails(connection.from, connection.to);
+
+    return Boolean(
+      details &&
+      details.clientDevice &&
+      Number(details.clientDevice.id) === clientId
+    );
+  });
+}
+
 function getPortUsageLabel(deviceId, port, ignoreConnectionId = null) {
   const usedCount = getUsedPortConnectionCount(deviceId, port.id, ignoreConnectionId);
+  const device = getDeviceById(deviceId);
 
   if (!usedCount) return 'Available';
+
+  if (isConnectionWirelessSsidDevice(device)) {
+    return usedCount + ' wireless client' + (usedCount === 1 ? '' : 's');
+  }
 
   if (isReusablePort(port)) {
     return usedCount + ' connection' + (usedCount === 1 ? '' : 's');
@@ -142,6 +356,8 @@ function populatePortSelect(selectId, deviceId, selectedPortId = null, ignoreCon
   if (!select) return;
 
   const ports = getDevicePorts(deviceId);
+  const device = getDeviceById(deviceId);
+  const isWirelessSsid = isConnectionWirelessSsidDevice(device);
 
   if (!ports.length) {
     select.innerHTML = '<option value="">No ports</option>';
@@ -166,7 +382,11 @@ function populatePortSelect(selectId, deviceId, selectedPortId = null, ignoreCon
       ? ' · ' + port.mode
       : '';
 
-    const label = `${port.name || 'Port ' + port.id} · ${usage}${modeText}`;
+    const portName = isWirelessSsid
+      ? 'Wireless Link ' + port.id
+      : port.name || 'Port ' + port.id;
+
+    const label = `${portName} · ${usage}${modeText}`;
 
     return `<option value="${port.id}" ${disabled}>${escapeHtml(label)}</option>`;
   }).join('');
@@ -238,6 +458,9 @@ function updateConnectionAddButtonState() {
 
   if (!values) return;
 
+  updateConnectionModalLabels(values.from, values.to);
+  applyWirelessConnectionDefaults(values.from, values.to);
+
   let error = '';
 
   if (values.from === values.to) {
@@ -257,7 +480,11 @@ function updateConnectionAddButtonState() {
   }
 
   if (message) {
-    message.textContent = error || 'Ready to add connection';
+    message.textContent = error || (
+      connectionInvolvesWirelessSsid(values.from, values.to)
+        ? 'Ready to add wireless association'
+        : 'Ready to add connection'
+    );
     message.classList.toggle('warning', Boolean(error));
   }
 }
@@ -286,6 +513,7 @@ function refreshConnectionModalPorts() {
   populatePortSelect('connFromPort', from, currentFromPort, null);
   populatePortSelect('connToPort', to, currentToPort, null);
 
+  updateConnectionModalLabels(from, to);
   updateConnectionAddButtonState();
 }
 
@@ -294,6 +522,8 @@ function refreshSelectedConnectionPorts() {
 
   const connection = state.connections.find(c => c.id === state.selectedId);
   if (!connection) return;
+
+  updateSelectedConnectionLabels(connection);
 
   populatePortSelect(
     'propConnFromPort',
@@ -328,12 +558,26 @@ function validateConnectionPorts(from, fromPort, to, toPort, ignoreConnectionId 
     return '⚠ Cannot connect a device to itself';
   }
 
-  if (!fromPort || !toPort) {
-    return '⚠ Select ports for both devices';
-  }
+  const wirelessAssociation = getWirelessAssociationDetails(from, to);
 
   const fromDevice = getDeviceById(from);
   const toDevice = getDeviceById(to);
+  const fromIsSsid = isConnectionWirelessSsidDevice(fromDevice);
+  const toIsSsid = isConnectionWirelessSsidDevice(toDevice);
+
+  if (fromIsSsid || toIsSsid) {
+    if (!wirelessAssociation) {
+      return '⚠ Wireless associations require one SSID and one endpoint client. Network devices stay wired.';
+    }
+
+    if (wirelessClientAssociationExists(wirelessAssociation.clientDevice.id, ignoreConnectionId)) {
+      return '⚠ ' + wirelessAssociation.clientDevice.name + ' is already connected to another SSID. Disconnect it before joining a new SSID.';
+    }
+  }
+
+  if (!fromPort || !toPort) {
+    return '⚠ Select ports for both devices';
+  }
 
   const fromPortObj = getPortById(from, fromPort);
   const toPortObj = getPortById(to, toPort);
@@ -352,6 +596,15 @@ function validateConnectionPorts(from, fromPort, to, toPort, ignoreConnectionId 
     cannot be added twice, including the reverse direction.
   */
   if (connectionPairExists(from, fromPort, to, toPort, ignoreConnectionId)) {
+    if (wirelessAssociation) {
+      return (
+        '⚠ Wireless association already exists: ' +
+        wirelessAssociation.ssidDevice.name +
+        ' ↔ ' +
+        wirelessAssociation.clientDevice.name
+      );
+    }
+
     return (
       '⚠ Connection already exists: ' +
       fromDevice.name +
@@ -397,6 +650,7 @@ function openConnectionModal() {
   }
 
   refreshConnectionModalPorts();
+  applyWirelessConnectionDefaults(Number(connFrom.value), Number(connTo.value));
   updateConnectionAddButtonState();
 
   connectionModal.style.display = 'flex';
@@ -405,9 +659,11 @@ function openConnectionModal() {
 function addConnection() {
   const from = Number(connFrom.value);
   const to = Number(connTo.value);
-  const style = connStyle.value;
+  const requestedStyle = typeof connStyle !== 'undefined' && connStyle ? connStyle.value : 'solid';
+  const style = getConnectionStyleValue(from, to, requestedStyle);
   const shape = typeof connShape !== 'undefined' ? connShape.value : 'smart';
-  const status = connStatus.value;
+  const status = String(connStatus.value || 'online').toLowerCase();
+  const wirelessAssociation = getWirelessAssociationDetails(from, to);
 
   if (from === to) {
     updateConnectionAddButtonState();
@@ -464,7 +720,7 @@ function addConnection() {
     style,
     shape,
     status,
-    color: '',
+    color: getConnectionColor({ from, to, style, status }),
     points: [],
     fromSide: 'auto',
     toSide: 'auto'
@@ -478,7 +734,14 @@ function addConnection() {
   const fromPortObj = getPortById(from, fromPort);
   const toPortObj = getPortById(to, toPort);
 
-  if (fromPortObj && toPortObj && fromDevice && toDevice) {
+  if (wirelessAssociation) {
+    setStatus(
+      'Wireless association added: ' +
+      wirelessAssociation.ssidDevice.name +
+      ' ↔ ' +
+      wirelessAssociation.clientDevice.name
+    );
+  } else if (fromPortObj && toPortObj && fromDevice && toDevice) {
     setStatus(
       'Connection added: ' +
       fromDevice.name +

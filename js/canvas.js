@@ -99,6 +99,68 @@ function getDeviceZone(device) {
   return null;
 }
 
+function canvasIsWirelessSsidDevice(device) {
+  if (!device) return false;
+
+  const type = String(device.type || "").toLowerCase();
+  const name = String(device.name || "").toLowerCase();
+  const sub = String(device.sub || "").toLowerCase();
+
+  return (
+    type === "wifi" ||
+    name.includes("ssid") ||
+    name.includes("wi-fi") ||
+    name.includes("wifi") ||
+    sub.includes("ssid") ||
+    sub.includes("wi-fi") ||
+    sub.includes("wifi")
+  );
+}
+
+function getCanvasWirelessSsidForClient(device) {
+  if (!device) return null;
+  if (canvasIsWirelessSsidDevice(device)) return null;
+  if (isNetworkInfrastructureDevice(device)) return null;
+
+  const deviceId = Number(device.id);
+
+  for (const connection of state.connections) {
+    const fromDevice = state.devices.find(item => Number(item.id) === Number(connection.from));
+    const toDevice = state.devices.find(item => Number(item.id) === Number(connection.to));
+
+    const fromIsClient = Number(connection.from) === deviceId;
+    const toIsClient = Number(connection.to) === deviceId;
+
+    if (!fromIsClient && !toIsClient) continue;
+
+    const remoteDevice = fromIsClient ? toDevice : fromDevice;
+
+    if (canvasIsWirelessSsidDevice(remoteDevice)) {
+      return remoteDevice;
+    }
+  }
+
+  return null;
+}
+
+function getCanvasWirelessInheritedZone(device) {
+  const ssidDevice = getCanvasWirelessSsidForClient(device);
+
+  if (!ssidDevice) return null;
+
+  return getDeviceZone(ssidDevice);
+}
+
+function getEffectiveCanvasDeviceZone(device) {
+  if (!device) return null;
+
+  const physicalZone = getDeviceZone(device);
+
+  if (physicalZone) return physicalZone;
+
+  return getCanvasWirelessInheritedZone(device);
+}
+
 /* =========================
    PHASE 7.5 — VLAN MOVE DETECTION
 ========================= */
@@ -280,35 +342,37 @@ function getDeviceColor(device) {
     return getDeviceOwnColor(device);
   }
 
-  const zone = getDeviceZone(device);
+  const zone = getEffectiveCanvasDeviceZone(device);
 
   return zone ? zone.color : getDeviceOwnColor(device);
 }
 
 function getConnectionColor(connection) {
-  if (connection.status && connection.status !== "online") {
-    return STATUS_COLOR[connection.status] || "#ffffff";
+  const status = String(connection.status || "online").toLowerCase();
+
+  if (status !== "online") {
+    return STATUS_COLOR[status] || "#ffffff";
   }
 
-  const fromDevice = state.devices.find(device => device.id === connection.from);
-  const toDevice = state.devices.find(device => device.id === connection.to);
+  const fromDevice = state.devices.find(device => Number(device.id) === Number(connection.from));
+  const toDevice = state.devices.find(device => Number(device.id) === Number(connection.to));
 
   if (!fromDevice && !toDevice) return "#ffffff";
   if (fromDevice && !toDevice) return getDeviceColor(fromDevice);
   if (!fromDevice && toDevice) return getDeviceColor(toDevice);
 
-  const fromZone = getDeviceZone(fromDevice);
-  const toZone = getDeviceZone(toDevice);
+  const fromZone = getEffectiveCanvasDeviceZone(fromDevice);
+  const toZone = getEffectiveCanvasDeviceZone(toDevice);
 
   if (fromZone && toZone) {
-    if (fromZone.id === toZone.id) return fromZone.color;
-    return fromDevice.id > toDevice.id ? fromZone.color : toZone.color;
+    if (Number(fromZone.id) === Number(toZone.id)) return fromZone.color;
+    return Number(fromDevice.id) > Number(toDevice.id) ? fromZone.color : toZone.color;
   }
 
   if (fromZone && !toZone) return fromZone.color;
   if (!fromZone && toZone) return toZone.color;
 
-  return fromDevice.id > toDevice.id
+  return Number(fromDevice.id) > Number(toDevice.id)
     ? getDeviceColor(fromDevice)
     : getDeviceColor(toDevice);
 }
@@ -2108,6 +2172,7 @@ function drawConnection(connection, index, timestamp) {
   const points = getConnectionPoints(connection, fromDevice, toDevice);
   const color = getConnectionColor(connection);
   const scale = state.boxScale || 1;
+  const status = String(connection.status || "online").toLowerCase();
 
   if (highlighted) {
     const pulse = 0.55 + Math.sin(timestamp / 180) * 0.18;
@@ -2119,7 +2184,7 @@ function drawConnection(connection, index, timestamp) {
     ctx.shadowColor = color;
     ctx.shadowBlur = 24 * scale;
 
-    if (connection.style === "dashed" || connection.status === "blocked") {
+    if (connection.style === "dashed" || status === "blocked") {
       ctx.setLineDash([8 * scale, 7 * scale]);
     }
 
@@ -2131,7 +2196,7 @@ function drawConnection(connection, index, timestamp) {
     ctx.globalAlpha = 0.28;
     ctx.lineWidth = 3.2 * scale;
 
-    if (connection.style === "dashed" || connection.status === "blocked") {
+    if (connection.style === "dashed" || status === "blocked") {
       ctx.setLineDash([8 * scale, 7 * scale]);
     }
 
@@ -2144,7 +2209,7 @@ function drawConnection(connection, index, timestamp) {
   ctx.globalAlpha =
     active
       ? 0.95
-      : connection.status === "down"
+      : status === "offline"
         ? 0.5
         : 0.4;
 
@@ -2152,12 +2217,12 @@ function drawConnection(connection, index, timestamp) {
     (
       active
         ? 3.8
-        : connection.status === "warning"
+        : status === "warning"
           ? 2.7
           : 2
     ) * scale;
 
-  if (connection.style === "dashed" || connection.status === "blocked") {
+  if (connection.style === "dashed" || status === "blocked") {
     ctx.setLineDash([7 * scale, 6 * scale]);
   }
 
@@ -2321,19 +2386,23 @@ function findWanDevice() {
 
 function getConnectionBetween(aId, bId) {
   return state.connections.find(connection =>
-    (connection.from === aId && connection.to === bId) ||
-    (connection.from === bId && connection.to === aId)
+    (Number(connection.from) === Number(aId) && Number(connection.to) === Number(bId)) ||
+    (Number(connection.from) === Number(bId) && Number(connection.to) === Number(aId))
   );
 }
 
 function getDeviceNeighbors(deviceId) {
   return state.connections
-    .filter(connection =>
-      connection.status !== "down" &&
-      connection.status !== "blocked" &&
-      (connection.from === deviceId || connection.to === deviceId)
-    )
-    .map(connection => connection.from === deviceId ? connection.to : connection.from);
+    .filter(connection => {
+      const status = String(connection.status || "online").toLowerCase();
+
+      return (
+        status !== "offline" &&
+        status !== "blocked" &&
+        (Number(connection.from) === Number(deviceId) || Number(connection.to) === Number(deviceId))
+      );
+    })
+    .map(connection => Number(connection.from) === Number(deviceId) ? connection.to : connection.from);
 }
 
 function findPathToWan(startId, wanId) {
@@ -2344,14 +2413,16 @@ function findPathToWan(startId, wanId) {
     const path = queue.shift();
     const current = path[path.length - 1];
 
-    if (current === wanId) return path;
+    if (Number(current) === Number(wanId)) return path;
 
     const neighbors = getDeviceNeighbors(current);
 
     neighbors.forEach(neighborId => {
-      if (!visited.has(neighborId)) {
-        visited.add(neighborId);
-        queue.push([...path, neighborId]);
+      const cleanNeighborId = Number(neighborId);
+
+      if (!visited.has(cleanNeighborId)) {
+        visited.add(cleanNeighborId);
+        queue.push([...path, cleanNeighborId]);
       }
     });
   }
@@ -2367,14 +2438,16 @@ function getPacketStartDevices(wanId) {
   });
 
   state.connections.forEach(connection => {
-    if (connection.status === "down" || connection.status === "blocked") return;
+    const status = String(connection.status || "online").toLowerCase();
+
+    if (status === "offline" || status === "blocked") return;
 
     degree[connection.from] = (degree[connection.from] || 0) + 1;
     degree[connection.to] = (degree[connection.to] || 0) + 1;
   });
 
   return state.devices.filter(device => {
-    if (device.id === wanId) return false;
+    if (Number(device.id) === Number(wanId)) return false;
 
     const name = String(device.name || "").toLowerCase();
     const type = String(device.type || "").toLowerCase();
@@ -2605,7 +2678,8 @@ function drawDevice(device) {
   const selected = isCanvasItemSelected("device", device.id);
 
   const color = getDeviceColor(device);
-  const statusColor = STATUS_COLOR[device.status] || color;
+  const status = String(device.status || "online").toLowerCase();
+  const statusColor = STATUS_COLOR[status] || color;
   const scale = state.boxScale || 1;
   const rotation = device.rotation || 0;
 

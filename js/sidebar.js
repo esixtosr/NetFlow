@@ -580,6 +580,7 @@ function sidebarIsNetworkInfrastructureDevice(device) {
   );
 }
 
+
 function sidebarIsWirelessSsidDevice(device) {
   if (!device) return false;
 
@@ -596,6 +597,128 @@ function sidebarIsWirelessSsidDevice(device) {
     sub.includes('wi-fi') ||
     sub.includes('wifi')
   );
+}
+
+function sidebarIsAccessPointDevice(device) {
+  if (!device) return false;
+  if (sidebarIsWirelessSsidDevice(device)) return false;
+
+  const type = String(device.type || '').toLowerCase();
+  const name = String(device.name || '').toLowerCase();
+  const sub = String(device.sub || '').toLowerCase();
+
+  return (
+    type === 'ap' ||
+    type === 'access-point' ||
+    type === 'access point' ||
+    name.includes('access point') ||
+    name.includes(' ap') ||
+    name.includes('u7') ||
+    name.includes('u6') ||
+    name.includes('unifi') ||
+    sub.includes('access point') ||
+    sub.includes(' ap') ||
+    sub.includes('wireless access point')
+  );
+}
+
+function getSsidBroadcastDetailsForConnection(connection) {
+  if (!connection) return null;
+
+  const fromDevice = state.devices.find(device => Number(device.id) === Number(connection.from));
+  const toDevice = state.devices.find(device => Number(device.id) === Number(connection.to));
+
+  const fromIsSsid = sidebarIsWirelessSsidDevice(fromDevice);
+  const toIsSsid = sidebarIsWirelessSsidDevice(toDevice);
+
+  if (fromIsSsid === toIsSsid) return null;
+
+  const ssidDevice = fromIsSsid ? fromDevice : toDevice;
+  const apDevice = fromIsSsid ? toDevice : fromDevice;
+
+  if (!sidebarIsAccessPointDevice(apDevice)) return null;
+
+  return {
+    connection,
+    ssidDevice,
+    apDevice
+  };
+}
+
+function getSsidBroadcastsForSsid(device) {
+  if (!sidebarIsWirelessSsidDevice(device)) return [];
+
+  return state.connections
+    .map(connection => getSsidBroadcastDetailsForConnection(connection))
+    .filter(details => details && Number(details.ssidDevice.id) === Number(device.id));
+}
+
+function getBroadcastSsidsForAccessPoint(device) {
+  if (!sidebarIsAccessPointDevice(device)) return [];
+
+  return state.connections
+    .map(connection => getSsidBroadcastDetailsForConnection(connection))
+    .filter(details => details && Number(details.apDevice.id) === Number(device.id));
+}
+
+function renderSsidBroadcastRowsForSsid(device) {
+  const broadcasts = getSsidBroadcastsForSsid(device);
+
+  if (!broadcasts.length) {
+    return `
+      <div class="ports-table-empty">
+        No access point broadcasting this SSID yet
+      </div>
+    `;
+  }
+
+  return `
+    <div class="assigned-vlan-chips" style="margin:14px 0 12px;padding:0;border:0;">
+      ${broadcasts.map(details => `
+        <button
+          class="assigned-vlan-chip"
+          onclick="selectItem('device', ${details.apDevice.id})"
+          type="button"
+        >
+          <span class="assigned-vlan-dot"></span>
+          <span>${escapeHtml(details.apDevice.name || 'Access Point')}</span>
+        </button>
+      `).join('')}
+    </div>
+  `;
+}
+
+function renderBroadcastSsidRowsForAccessPoint(device) {
+  const broadcasts = getBroadcastSsidsForAccessPoint(device);
+
+  if (!broadcasts.length) {
+    return `
+      <div class="assigned-vlan-empty">
+        No SSIDs connected to this access point yet
+      </div>
+    `;
+  }
+
+  return `
+    <div class="assigned-vlan-chips">
+      ${broadcasts.map(details => {
+        const zone = getDeviceZone(details.ssidDevice);
+        const color = zone && zone.color ? zone.color : getDeviceColor(details.ssidDevice);
+
+        return `
+          <button
+            class="assigned-vlan-chip"
+            style="--vlan-color:${color}"
+            onclick="selectItem('device', ${details.ssidDevice.id})"
+            type="button"
+          >
+            <span class="assigned-vlan-dot"></span>
+            <span>${escapeHtml(details.ssidDevice.name || 'SSID')}</span>
+          </button>
+        `;
+      }).join('')}
+    </div>
+  `;
 }
 
 function getConnectedDevicesForDevice(device) {
@@ -937,6 +1060,7 @@ function renderWirelessSsidProfileCard(device, zone) {
   const clientCount = getWirelessClientsForSsid(device).length;
   const managementIp = String(device && device.ipAddress ? device.ipAddress : '').trim();
   const ipMode = getDeviceIpMode(device);
+  const broadcastCount = getSsidBroadcastsForSsid(device).length;
   const ssidVlanColor = zone && zone.color
     ? zone.color
     : getDeviceColor(device);
@@ -957,6 +1081,13 @@ function renderWirelessSsidProfileCard(device, zone) {
         <span>Management IP</span>
         <strong>${escapeHtml(managementIp || 'Manual only')}</strong>
       </div>
+
+      <div class="details-meta-row">
+        <span>Broadcasted By</span>
+        <strong>${broadcastCount ? broadcastCount + ' access point' + (broadcastCount === 1 ? '' : 's') : 'Not assigned'}</strong>
+      </div>
+
+      ${renderSsidBroadcastRowsForSsid(device)}
 
       <div class="details-meta-row">
         <span>IP Mode</span>
@@ -1697,6 +1828,9 @@ function renderDeviceNetworkMetaCard(device, zone) {
     const assignedCount = getAssignedVlansForNetworkDevice(device).length;
     const zoneName = zone ? zone.name || 'Unnamed VLAN' : 'No VLAN zone detected';
     const managementIp = String(device && device.ipAddress ? device.ipAddress : '').trim();
+    const broadcastCount = sidebarIsAccessPointDevice(device)
+      ? getBroadcastSsidsForAccessPoint(device).length
+      : 0;
 
     return `
       <div class="details-meta-card network-infra-profile-card">
@@ -1723,6 +1857,23 @@ function renderDeviceNetworkMetaCard(device, zone) {
           <strong>Carries or connects VLAN traffic</strong>
         </div>
       </div>
+
+      ${sidebarIsAccessPointDevice(device) ? `
+        <div class="details-meta-card assigned-vlan-card">
+          <div class="assigned-vlan-head">
+            <div>
+              <div class="assigned-vlan-title">Broadcast SSIDs</div>
+              <div class="assigned-vlan-sub">
+                ${broadcastCount
+                  ? broadcastCount + ' SSID' + (broadcastCount === 1 ? '' : 's') + ' broadcast by this access point'
+                  : 'Connect this AP to SSID devices to document broadcasts'}
+              </div>
+            </div>
+          </div>
+
+          ${renderBroadcastSsidRowsForAccessPoint(device)}
+        </div>
+      ` : ''}
 
       <div class="details-meta-card assigned-vlan-card">
         <div class="assigned-vlan-head">

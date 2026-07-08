@@ -2391,6 +2391,111 @@ function getConnectionBetween(aId, bId) {
   );
 }
 
+function isCanvasWirelessClientConnection(connection) {
+  if (!connection) return false;
+
+  if (connection.linkType === "wireless-client") return true;
+  if (connection.linkType === "ssid-broadcast") return false;
+
+  const fromDevice = state.devices.find(device => Number(device.id) === Number(connection.from));
+  const toDevice = state.devices.find(device => Number(device.id) === Number(connection.to));
+
+  const fromIsSsid = canvasIsWirelessSsidDevice(fromDevice);
+  const toIsSsid = canvasIsWirelessSsidDevice(toDevice);
+
+  if (fromIsSsid === toIsSsid) return false;
+
+  const clientDevice = fromIsSsid ? toDevice : fromDevice;
+
+  if (!clientDevice) return false;
+  if (isNetworkInfrastructureDevice(clientDevice)) return false;
+
+  return true;
+}
+
+function drawPacketBubble(position, scale) {
+  if (!position) return;
+
+  ctx.save();
+
+  ctx.globalAlpha = 0.95;
+  ctx.shadowBlur = 16 * scale;
+  ctx.shadowColor = position.color;
+
+  ctx.fillStyle = "#ffffff";
+  ctx.beginPath();
+  ctx.arc(position.x, position.y, 4.4 * scale, 0, Math.PI * 2);
+  ctx.fill();
+
+  ctx.globalAlpha = 0.25;
+  ctx.fillStyle = position.color;
+  ctx.beginPath();
+  ctx.arc(position.x, position.y, 14 * scale, 0, Math.PI * 2);
+  ctx.fill();
+
+  ctx.restore();
+}
+
+function getConnectionAnimationSegments(connection) {
+  if (!connection) return [];
+
+  const fromDevice = state.devices.find(device => Number(device.id) === Number(connection.from));
+  const toDevice = state.devices.find(device => Number(device.id) === Number(connection.to));
+
+  if (!fromDevice || !toDevice) return [];
+
+  const points = getConnectionHitPoints(connection, fromDevice, toDevice);
+  const color = getConnectionColor(connection);
+  const segments = [];
+
+  for (let p = 0; p < points.length - 1; p++) {
+    const from = points[p];
+    const to = points[p + 1];
+    const length = Math.hypot(to[0] - from[0], to[1] - from[1]);
+
+    if (length > 0) {
+      segments.push({
+        from,
+        to,
+        length,
+        color
+      });
+    }
+  }
+
+  return segments;
+}
+
+function drawWirelessClientConnectionPackets(packetTimestamp, scale) {
+  const wirelessConnections = state.connections.filter(connection => {
+    const status = String(connection.status || "online").toLowerCase();
+
+    return (
+      status !== "offline" &&
+      status !== "blocked" &&
+      isCanvasWirelessClientConnection(connection)
+    );
+  });
+
+  wirelessConnections.forEach((connection, index) => {
+    const segments = getConnectionAnimationSegments(connection);
+
+    if (!segments.length) return;
+
+    const baseSpeed = 7200;
+    const speed = baseSpeed / Math.max(state.packetSpeed || 0.55, 0.05);
+    const raw = ((packetTimestamp + index * 1250) % speed) / speed;
+    const t = raw < 0.5 ? raw * 2 : 2 - raw * 2;
+
+    const eased =
+      t < 0.5
+        ? 4 * t * t * t
+        : 1 - Math.pow(-2 * t + 2, 3) / 2;
+
+    drawPacketBubble(pointAlongSegments(segments, eased), scale);
+  });
+}
+
 function getDeviceNeighbors(deviceId) {
   return state.connections
     .filter(connection => {
@@ -2555,12 +2660,15 @@ function drawNetworkPackets(timestamp = 0) {
 
   if (packetTimestamp === null) return;
 
+  const scale = state.boxScale || 1;
+
+  drawWirelessClientConnectionPackets(packetTimestamp, scale);
+
   const wanDevice = findWanDevice();
 
   if (!wanDevice) return;
 
   const startDevices = getPacketStartDevices(wanDevice.id);
-  const scale = state.boxScale || 1;
 
   startDevices.forEach((device, index) => {
     const path = findPathToWan(device.id, wanDevice.id);
@@ -2586,24 +2694,7 @@ function drawNetworkPackets(timestamp = 0) {
 
     if (!pos) return;
 
-    ctx.save();
-
-    ctx.globalAlpha = 0.95;
-    ctx.shadowBlur = 16 * scale;
-    ctx.shadowColor = pos.color;
-
-    ctx.fillStyle = "#ffffff";
-    ctx.beginPath();
-    ctx.arc(pos.x, pos.y, 4.4 * scale, 0, Math.PI * 2);
-    ctx.fill();
-
-    ctx.globalAlpha = 0.25;
-    ctx.fillStyle = pos.color;
-    ctx.beginPath();
-    ctx.arc(pos.x, pos.y, 14 * scale, 0, Math.PI * 2);
-    ctx.fill();
-
-    ctx.restore();
+    drawPacketBubble(pos, scale);
   });
 }
 

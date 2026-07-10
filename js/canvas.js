@@ -1676,6 +1676,140 @@ function getConnectionPoints(connection, fromDevice, toDevice) {
   return routePointsWithAnchors(start, end);
 }
 
+function getRoutePadding() {
+  return 28 * (state.boxScale || 1);
+}
+
+function getRouteObstacleRects(start, end) {
+  const padding = getRoutePadding();
+
+  return state.devices
+    .map(device => ({
+      left: device.x - padding,
+      top: device.y - padding,
+      right: device.x + device.w + padding,
+      bottom: device.y + device.h + padding
+    }))
+    .filter(rect => {
+      const startInside =
+        start[0] >= rect.left && start[0] <= rect.right &&
+        start[1] >= rect.top && start[1] <= rect.bottom;
+      const endInside =
+        end[0] >= rect.left && end[0] <= rect.right &&
+        end[1] >= rect.top && end[1] <= rect.bottom;
+
+      return !startInside && !endInside;
+    });
+}
+
+function segmentHitsRouteRect(a, b, rect) {
+  const minX = Math.min(a[0], b[0]);
+  const maxX = Math.max(a[0], b[0]);
+  const minY = Math.min(a[1], b[1]);
+  const maxY = Math.max(a[1], b[1]);
+
+  if (a[1] === b[1]) {
+    return a[1] > rect.top && a[1] < rect.bottom &&
+      maxX > rect.left && minX < rect.right;
+  }
+
+  if (a[0] === b[0]) {
+    return a[0] > rect.left && a[0] < rect.right &&
+      maxY > rect.top && minY < rect.bottom;
+  }
+
+  return maxX > rect.left && minX < rect.right &&
+    maxY > rect.top && minY < rect.bottom;
+}
+
+function routeLength(points) {
+  let length = 0;
+
+  for (let i = 1; i < points.length; i++) {
+    length += Math.abs(points[i][0] - points[i - 1][0]);
+    length += Math.abs(points[i][1] - points[i - 1][1]);
+  }
+
+  return length;
+}
+
+function normalizeRoute(points) {
+  const normalized = [];
+
+  points.forEach(point => {
+    const previous = normalized[normalized.length - 1];
+
+    if (!previous || previous[0] !== point[0] || previous[1] !== point[1]) {
+      normalized.push([point[0], point[1]]);
+    }
+  });
+
+  for (let i = normalized.length - 2; i > 0; i--) {
+    const previous = normalized[i - 1];
+    const current = normalized[i];
+    const next = normalized[i + 1];
+    const sameX = previous[0] === current[0] && current[0] === next[0];
+    const sameY = previous[1] === current[1] && current[1] === next[1];
+
+    if (sameX || sameY) {
+      normalized.splice(i, 1);
+    }
+  }
+
+  return normalized;
+}
+
+function scoreRoute(points, obstacles) {
+  let obstacleHits = 0;
+
+  obstacles.forEach(rect => {
+    for (let i = 1; i < points.length; i++) {
+      if (segmentHitsRouteRect(points[i - 1], points[i], rect)) {
+        obstacleHits++;
+        break;
+      }
+    }
+  });
+
+  return {
+    obstacleHits,
+    bends: Math.max(0, points.length - 2),
+    length: routeLength(points)
+  };
+}
+
+function buildRouteCandidates(start, end, obstacles) {
+  const ax = start[0];
+  const ay = start[1];
+  const bx = end[0];
+  const by = end[1];
+  const midX = (ax + bx) / 2;
+  const midY = (ay + by) / 2;
+  const candidates = [
+    [[ax, ay], [midX, ay], [midX, by], [bx, by]],
+    [[ax, ay], [ax, midY], [bx, midY], [bx, by]]
+  ];
+  const xLanes = new Set([midX]);
+  const yLanes = new Set([midY]);
+
+  obstacles.forEach(rect => {
+    xLanes.add(rect.left);
+    xLanes.add(rect.right);
+    yLanes.add(rect.top);
+    yLanes.add(rect.bottom);
+  });
+
+  xLanes.forEach(x => {
+    candidates.push([[ax, ay], [x, ay], [x, by], [bx, by]]);
+  });
+
+  yLanes.forEach(y => {
+    candidates.push([[ax, ay], [ax, y], [bx, y], [bx, by]]);
+  });
+
+  return candidates.map(normalizeRoute);
+}
+
 function routePointsWithAnchors(start, end) {
   const ax = start[0];
   const ay = start[1];
@@ -1685,25 +1819,44 @@ function routePointsWithAnchors(start, end) {
   const dx = Math.abs(bx - ax);
   const dy = Math.abs(by - ay);
 
+  let defaultRoute;
+
   if (dx > dy) {
     const midX = (ax + bx) / 2;
 
-    return [
+    defaultRoute = [
       [ax, ay],
       [midX, ay],
       [midX, by],
       [bx, by]
     ];
+  } else {
+    const midY = (ay + by) / 2;
+
+    defaultRoute = [
+      [ax, ay],
+      [ax, midY],
+      [bx, midY],
+      [bx, by]
+    ];
   }
 
-  const midY = (ay + by) / 2;
-
-  return [
-    [ax, ay],
-    [ax, midY],
-    [bx, midY],
-    [bx, by]
+  const obstacles = getRouteObstacleRects(start, end);
+  const candidates = [
+    normalizeRoute(defaultRoute),
+    ...buildRouteCandidates(start, end, obstacles)
   ];
+
+  candidates.sort((first, second) => {
+    const firstScore = scoreRoute(first, obstacles);
+    const secondScore = scoreRoute(second, obstacles);
+
+    return firstScore.obstacleHits - secondScore.obstacleHits ||
+      firstScore.bends - secondScore.bends ||
+      firstScore.length - secondScore.length;
+  });
+
+  return candidates[0];
 }
 
 function getTwoPointCurveControl(start, end) {

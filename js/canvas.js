@@ -9,6 +9,8 @@ let zoneMoveSnapshot = null;
 
 let smartSnapActive = false;
 let smartSnapType = "";
+let placementSnapActive = false;
+let placementSnapGuides = [];
 
 let packetAnimationClock = 0;
 let packetAnimationLastTimestamp = null;
@@ -1379,6 +1381,161 @@ function applySmartBendSnap(rawPoint, bendDrag) {
   };
 }
 
+function clearPlacementSnap() {
+  placementSnapActive = false;
+  placementSnapGuides = [];
+}
+
+function getPlacementSnapItems(draggedItem) {
+  return [...state.devices, ...state.zones].filter(item => item !== draggedItem);
+}
+
+function buildPlacementSnapGuide(axis, type, draggedItem, target) {
+  const padding = 12 / Math.max(state.zoom || 1, 0.35);
+
+  if (type === "gap-left") {
+    return {
+      x1: draggedItem.x + draggedItem.w,
+      y1: draggedItem.y + draggedItem.h / 2,
+      x2: target.x,
+      y2: draggedItem.y + draggedItem.h / 2
+    };
+  }
+
+  if (type === "gap-right") {
+    return {
+      x1: target.x + target.w,
+      y1: draggedItem.y + draggedItem.h / 2,
+      x2: draggedItem.x,
+      y2: draggedItem.y + draggedItem.h / 2
+    };
+  }
+
+  if (type === "gap-above") {
+    return {
+      x1: draggedItem.x + draggedItem.w / 2,
+      y1: draggedItem.y + draggedItem.h,
+      x2: draggedItem.x + draggedItem.w / 2,
+      y2: target.y
+    };
+  }
+
+  if (type === "gap-below") {
+    return {
+      x1: draggedItem.x + draggedItem.w / 2,
+      y1: target.y + target.h,
+      x2: draggedItem.x + draggedItem.w / 2,
+      y2: draggedItem.y
+    };
+  }
+
+  if (axis === "x") {
+    const x = type === "left"
+      ? draggedItem.x
+      : type === "right"
+        ? draggedItem.x + draggedItem.w
+        : draggedItem.x + draggedItem.w / 2;
+
+    return {
+      x1: x,
+      y1: Math.min(draggedItem.y, target.y) - padding,
+      x2: x,
+      y2: Math.max(draggedItem.y + draggedItem.h, target.y + target.h) + padding
+    };
+  }
+
+  const y = type === "top"
+    ? draggedItem.y
+    : type === "bottom"
+      ? draggedItem.y + draggedItem.h
+      : draggedItem.y + draggedItem.h / 2;
+
+  return {
+    x1: Math.min(draggedItem.x, target.x) - padding,
+    y1: y,
+    x2: Math.max(draggedItem.x + draggedItem.w, target.x + target.w) + padding,
+    y2: y
+  };
+}
+
+function applyPlacementSnap(rawPosition, draggedItem, snapDisabled) {
+  if (snapDisabled) {
+    clearPlacementSnap();
+    smartSnapActive = false;
+    smartSnapType = "";
+    return rawPosition;
+  }
+
+  const threshold = 14 / Math.max(state.zoom || 1, 0.35);
+  const gap = 34 * (state.boxScale || 1);
+  const width = draggedItem.w;
+  const height = draggedItem.h;
+  const xCandidates = [];
+  const yCandidates = [];
+
+  getPlacementSnapItems(draggedItem).forEach(target => {
+    const targetRight = target.x + target.w;
+    const targetBottom = target.y + target.h;
+
+    [
+      { type: "left", value: target.x },
+      { type: "right", value: targetRight - width },
+      { type: "center-x", value: target.x + target.w / 2 - width / 2 },
+      { type: "gap-left", value: target.x - gap - width },
+      { type: "gap-right", value: targetRight + gap }
+    ].forEach(candidate => {
+      xCandidates.push({
+        ...candidate,
+        target,
+        distance: Math.abs(rawPosition.x - candidate.value)
+      });
+    });
+
+    [
+      { type: "top", value: target.y },
+      { type: "bottom", value: targetBottom - height },
+      { type: "center-y", value: target.y + target.h / 2 - height / 2 },
+      { type: "gap-above", value: target.y - gap - height },
+      { type: "gap-below", value: targetBottom + gap }
+    ].forEach(candidate => {
+      yCandidates.push({
+        ...candidate,
+        target,
+        distance: Math.abs(rawPosition.y - candidate.value)
+      });
+    });
+  });
+
+  const bestX = xCandidates
+    .filter(candidate => candidate.distance <= threshold)
+    .sort((a, b) => a.distance - b.distance)[0];
+  const bestY = yCandidates
+    .filter(candidate => candidate.distance <= threshold)
+    .sort((a, b) => a.distance - b.distance)[0];
+
+  const snappedPosition = {
+    x: bestX ? bestX.value : rawPosition.x,
+    y: bestY ? bestY.value : rawPosition.y
+  };
+
+  draggedItem.x = snappedPosition.x;
+  draggedItem.y = snappedPosition.y;
+
+  placementSnapGuides = [];
+  if (bestX) {
+    placementSnapGuides.push(buildPlacementSnapGuide("x", bestX.type, draggedItem, bestX.target));
+  }
+  if (bestY) {
+    placementSnapGuides.push(buildPlacementSnapGuide("y", bestY.type, draggedItem, bestY.target));
+  }
+
+  placementSnapActive = placementSnapGuides.length > 0;
+  smartSnapActive = placementSnapActive;
+  smartSnapType = [bestX?.type, bestY?.type].filter(Boolean).join(" + ");
+
+  return snappedPosition;
+}
+
 function hitBendPoint(x, y) {
   for (let i = state.connections.length - 1; i >= 0; i--) {
     const connection = state.connections[i];
@@ -1966,8 +2123,14 @@ canvas.addEventListener("mousemove", e => {
   }
 
   if (dragging) {
-    dragging.x = point.x - dragOffsetX;
-    dragging.y = point.y - dragOffsetY;
+    const rawPosition = {
+      x: point.x - dragOffsetX,
+      y: point.y - dragOffsetY
+    };
+    const snappedPosition = applyPlacementSnap(rawPosition, dragging, e.altKey);
+
+    dragging.x = snappedPosition.x;
+    dragging.y = snappedPosition.y;
     return;
   }
 
@@ -2015,6 +2178,7 @@ canvas.addEventListener("mouseup", () => {
   draggingBendPoint = null;
   smartSnapActive = false;
   smartSnapType = "";
+  clearPlacementSnap();
   resizingZone = null;
   panning = false;
 
@@ -2047,6 +2211,7 @@ canvas.addEventListener("mouseleave", () => {
   draggingBendPoint = null;
   smartSnapActive = false;
   smartSnapType = "";
+  clearPlacementSnap();
   resizingZone = null;
   panning = false;
 });
@@ -2935,6 +3100,26 @@ function drawSelectionBox() {
   ctx.restore();
 }
 
+function drawPlacementSnapGuides() {
+  if (!placementSnapActive || !placementSnapGuides.length) return;
+
+  ctx.save();
+  ctx.strokeStyle = "#22d3ee";
+  ctx.lineWidth = 1.5 / state.zoom;
+  ctx.setLineDash([6 / state.zoom, 4 / state.zoom]);
+  ctx.shadowColor = "#22d3ee";
+  ctx.shadowBlur = 7 / state.zoom;
+
+  placementSnapGuides.forEach(guide => {
+    ctx.beginPath();
+    ctx.moveTo(guide.x1, guide.y1);
+    ctx.lineTo(guide.x2, guide.y2);
+    ctx.stroke();
+  });
+
+  ctx.restore();
+}
+
 function isConnectionActiveOnCanvas(connection) {
   const selected =
     state.selectedType === "connection" &&
@@ -2975,6 +3160,7 @@ function drawScene(timestamp = 0) {
 
   state.devices.forEach(drawDevice);
 
+  drawPlacementSnapGuides();
   drawSelectionBox();
 
   ctx.restore();

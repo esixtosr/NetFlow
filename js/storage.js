@@ -1,3 +1,41 @@
+const NETFLOW_STORAGE_KEY = 'netflow-project';
+
+function getProjectPathFromUrl() {
+  const params = new URLSearchParams(window.location.search);
+  return params.get('project') || '';
+}
+
+async function loadProjectFromUrl() {
+  const projectPath = getProjectPathFromUrl();
+
+  if (!projectPath) return false;
+
+  try {
+    const response = await fetch(projectPath, { cache: 'no-store' });
+
+    if (!response.ok) {
+      throw new Error('Could not load project file: ' + projectPath);
+    }
+
+    const project = await response.json();
+
+    state = normalizeProject(project);
+    refreshSidebar();
+    updateUiState();
+    setStatus('Network diagram loaded');
+
+    return true;
+  } catch (error) {
+    console.error(error);
+    setStatus('⚠ Could not load network diagram');
+    return false;
+  }
+}
+
+window.addEventListener('load', () => {
+  loadProjectFromUrl();
+});
+
 function saveProject() {
   const clean = JSON.parse(JSON.stringify(state));
 
@@ -62,12 +100,16 @@ function saveProject() {
     c.toPort = c.toPort ? Number(c.toPort) : null;
   });
 
-  localStorage.setItem('netflow-project', JSON.stringify(clean));
+  localStorage.setItem(NETFLOW_STORAGE_KEY, JSON.stringify(clean));
   setStatus('Project saved locally');
 }
 
-function loadProject() {
-  const saved = localStorage.getItem('netflow-project');
+async function loadProject() {
+  const loadedFromUrl = await loadProjectFromUrl();
+
+  if (loadedFromUrl) return;
+
+  const saved = localStorage.getItem(NETFLOW_STORAGE_KEY);
 
   if (!saved) return setStatus('⚠ No saved project found');
 

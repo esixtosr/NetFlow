@@ -1197,7 +1197,7 @@
       "gatewayOverride": "",
       "dnsOverride": "",
       "ipMemoryByVlan": {
-        "zone-6": "10.20.20.11"
+        "zone-6": "10.20.20.20"
       },
       "portCount": 1,
       "ports": [
@@ -2068,8 +2068,8 @@
   },
   "clipboardMode": "copy",
   "selectionBox": null,
-  "viewX": 1405.3260539483713,
-  "viewY": 338.1226788480009,
+  "viewX": 1282.3260539483713,
+  "viewY": 329.1226788480009,
   "zoom": 0.670754331855715,
   "showPorts": false,
   "packetSpeed": 1.05,

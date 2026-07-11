@@ -1,140 +1,338 @@
-# 🌐 NetFlow: Interactive Enterprise Topology & Core Segmentation Planner
+<div align="center">
 
-NetFlow is an interactive, browser-native network topology design suite and documentation workbench engineered using vanilla HTML5, CSS3, and modern JavaScript. It is purpose-built to model multi-tier enterprise networks, visualize strict broadcast domain isolation (VLAN segmentation), map port-level physical layers, and export high-fidelity documentation matching rigorous auditing baselines.
+<img src="./assets/icons/netflow-favicon.png" alt="NetFlow logo" width="90">
 
-This platform bridges the gap between software development and deep infrastructure security engineering, providing a responsive canvas interface for blueprinting defense-in-depth security architectures without the overhead of heavy third-party modeling applications.
+# NetFlow
 
----
+### Interactive Network Topology and VLAN Planning
 
-## 🚀 Core Capabilities
+A browser-based network architecture workbench for designing physical connections, documenting port assignments, organizing VLANs, and visualizing segmented environments.
 
-NetFlow converts static diagramming into an active architectural layout directly inside the browser client sandbox:
+[Launch Live Demo](https://esixtosr.github.io/NetFlow/network/home-lab/) ·
+[Watch Demo](./assets/videos/netflow-demo.webm) ·
+[View Source](https://github.com/esixtosr/NetFlow)
 
-- **Strict Network Segmentation Mapping:** Rapidly deploy visual logical network wrappers to clearly define security boundaries, demilitarized zones (DMZs), and isolated subnets.
-- **Dynamic Network Profile Inheritance:** Devices automatically inherit subnets, domain name servers (DNS), default gateways, and DHCP operational states based on spatial containment inside a specific VLAN Zone.
-- **Infrastructure Telemetry Overrides:** Explicitly configure dedicated production platforms (*e.g., Domain Controllers, Hypervisors, Storage Arrays*) with manual static IP bindings, custom routing paths, and duplicate IP conflict alerting.
-- **Multi-VLAN Interface Accessibility Tracking:** Document advanced multi-homed infrastructure nodes (*such as Proxmox hypervisor clusters or managed Layer-2 switches*) that access distinct peripheral VLANs for management, storage, or staging.
-- **Port-Aware Interface Interconnections:** Establish discrete, stateful port-to-port connections complete with line styling modifiers representing physical link media (e.g., Solid for physical lines, Dashed for wireless boundaries).
-- **Automated Client-Side Media Rendering:** Export production-ready documentation as crisp PNG graphics, serialized JSON infrastructure backups, or fluid WebM/MP4 animated capture reels demonstrating mock packet paths.
+</div>
 
 ---
 
-## ✨ Engineering Spotlights
+[![NetFlow topology overview](./assets/images/netflow-overview.png)](https://esixtosr.github.io/NetFlow/network/home-lab/)
 
-### 🧭 High-Performance HTML5 Canvas Editor
-Features a hardware-accelerated drawing surface equipped with infinite multi-touch pan, dynamic contextual scroll wheel zooming, auto-snapping grid coordinates, and programmatic canvas auto-centering bounding boxes. It replicates the latency-free responsiveness of native desktop systems inside a single standard web viewport.
+## Overview
 
-### 🔌 Micro-Segmented Broadcast Domains (VLANs)
-Architect security perimeters cleanly by dragging infrastructure assets into distinct, color-coded boundaries. NetFlow natively handles spatial detection: shifting an endpoint into a new zone automatically prompts a VLAN move detection routine, purging or renewing lease allocations instantly to mirror standard real-world network operations.
+NetFlow is an interactive network topology editor built to document both the physical and logical sides of a network.
 
-### 🧠 Intelligently Suggested Network Variables
-The platform reads the network prefix configuration assigned to any given VLAN zone and instantly populates contextual dropdown selectors with valid, unused IP allocations in that boundary pool. It flags duplicate structural errors to ensure accuracy across all physical and logical connection channels.
+Instead of creating only a static diagram, NetFlow tracks devices, ports, connections, IP settings, VLAN membership, wireless clients, and network boundaries inside one browser-based workspace.
 
-### 📐 Structural Orthogonal Line Engineering
-Features smart vector rendering logic supporting snap-lock behaviors, absolute right-angle paths, and automatic alignment snapping. Connectors bypass layout blocks gracefully, establishing polished top-down system buses that prevent visual crowding or textual overlap.
+The included home-lab topology demonstrates a segmented environment containing:
+
+- Internet and gateway infrastructure
+- Managed switching and wireless access
+- Enterprise, management, projects, home, and IoT VLANs
+- Physical servers and virtual machines
+- Wired and wireless client relationships
+- Port-level device connections
+
+The application is built with vanilla JavaScript, HTML5 Canvas, and CSS without a front-end framework.
+
+## Key Features
+
+### Interactive topology canvas
+
+Create, position, rotate, and connect network devices on a zoomable grid-based workspace. Connections use orthogonal routing and remain attached while devices are moved.
+
+### Port-aware connections
+
+Connections are assigned between specific interfaces rather than being represented as unlabeled lines.
+
+For example:
+
+```text
+UCG-Fiber WAN 3 → USW-Flex-2.5G Port 2
+UCG-Fiber WAN 2 → U7 Pro Uplink
+Workstation NIC 1 → UCG-Fiber WAN 4
+```
+
+Selecting a port highlights the associated connection and displays both endpoints.
+
+### Device and network profiles
+
+The sidebar changes according to the selected object and can display:
+
+- Device type and status
+- Port availability and assignments
+- Connected and remote interfaces
+- IP address and addressing mode
+- Subnet, gateway, and DNS information
+- VLAN inheritance
+- Accessible VLANs
+- Wireless bands and connected clients
+
+### VLAN segmentation
+
+Devices can be grouped within visual VLAN zones containing network configuration such as:
+
+- VLAN ID
+- Subnet
+- Gateway
+- DNS servers
+- DHCP status
+- Zone color and rotation
+
+Endpoint devices inherit network information from their containing VLAN while infrastructure devices retain dedicated management and trunking information.
+
+### Wireless network modeling
+
+SSID objects represent wireless networks separately from access points.
+
+Each SSID can document:
+
+- Broadcast VLAN
+- Broadcasting access point
+- Static or dynamic addressing
+- Wireless bands
+- Connected wireless clients
+- Client IP addresses and status
+
+### Connection visualization
+
+Selecting a connection highlights its complete path and displays:
+
+- Source device and port
+- Destination device and port
+- Connection status
+- Line style
+- Routing shape
+
+Animated particles can also be used to visualize traffic paths throughout the topology.
+
+### Import and export
+
+NetFlow supports browser-side project management and documentation export, including:
+
+- JSON project files
+- PNG topology images
+- WebM topology recordings
+- Local browser persistence
+- Undo and redo history
 
 ---
 
-## 🖧 Baseline Production Topology Architecture
+## Feature Preview
 
-NetFlow boots up out-of-the-box pre-configured with a comprehensive real-world multi-tier network baseline, documenting exact interface port mapping, virtual boundaries, and hypervisor allocations:
+<table>
+<tr>
+<td width="50%">
+<img src="./assets/images/device-port-management.png" alt="Device port management">
+<br>
+<strong>Port Management</strong><br>
+View assigned, available, and connected interfaces for infrastructure devices.
+</td>
+<td width="50%">
+<img src="./assets/images/wireless-profile.png" alt="Wireless SSID profile">
+<br>
+<strong>Wireless Profiles</strong><br>
+Document SSIDs, VLAN assignments, radio bands, and wireless clients.
+</td>
+</tr>
+<tr>
+<td width="50%">
+<img src="./assets/images/connection-highlighting.png" alt="Highlighted network connection">
+<br>
+<strong>Connection Tracing</strong><br>
+Highlight a physical path and inspect both connected ports.
+</td>
+<td width="50%">
+<img src="./assets/images/vlan-zone-details.png" alt="Selected VLAN zone">
+<br>
+<strong>VLAN Documentation</strong><br>
+Inspect logical network boundaries and their addressing information.
+</td>
+</tr>
+</table>
 
-### 1. Physical Layer Port Specification
-* **Edge Routing & Security:** UniFi Cloud Gateway Fiber (CGF)
-  * `Port 2` ──> Windows 11 Workstation (Hardwired)
-  * `Port 3` ──> Downlink connection to USW Flex Switch Port 1
-  * `Port 4` ──> U7 Pro Wireless Access Point
-* **Distribution Switching:** USW Flex 2.5G 8 PoE Switch
-  * `Port 1` ──> Uplink from Cloud Gateway Fiber Port 3
-  * `Port 2` ──> Proxmox VE Hardware Management Interface
-  * `Port 3` ──> Enterprise Domain Controller (Dedicated SFF Hardware)
-  * `Port 4` ──> Proxmox Hypervisor Host 1 (Core Enterprise Compute)
-  * `Port 5` ──> Proxmox Hypervisor Host 2 (Lab & Projects Compute)
-  * `Port 6` ──> Raspberry Pi (Dedicated Testing Node)
-  * `Port 7` ──> Unassigned / Available Provisioning Port
-  * `Port 8` ──> Testing MacBook Pro Interface
+## Demo
 
-### 2. Logical Network Segmentation (VLAN Matrix)
-* **Default VLAN (Blue | 192.168.1.0/24):** Hosts core network routing elements, the physical Windows 11 workstation, and the primary wireless network broadcast.
-  * *SSID:* `CIA` (Broadcasting concurrently on 2.4 GHz, 5 GHz, and 6 GHz spectrums).
-* **Enterprise VLAN (Green | 10.20.20.0/26):** Production-tier compute block containing the hardware Active Directory Domain Controller, the dedicated testing Pi, a testing MacBook Pro, and the virtualized enterprise core instances running on Proxmox Host 1.
-  * *Host 1 Guests:* TrueNAS Core Storage, Ubuntu Server 24.04 (Node 1), Ubuntu Server 24.04 (Node 2), Windows Server 2025 Domain Controller 2, Windows 11 Enterprise VM.
-* **Projects VLAN (Orange | 10.30.30.0/26):** Dedicated testing sandbox containing the virtualized environments hosted on Proxmox Host 2.
-  * *Host 2 Guests:* Ubuntu Server 24.04 (Jellyfin Media), Windows 11 Dev Environment, Kali Linux Penetration Testing Suite.
-* **IoT VLAN (Teal | 10.40.40.0/27):** Isolated broadcast domain for legacy and smart systems.
-  * *SSID:* `FBI` (Restricted explicitly to the 2.4 GHz spectrum to maximize edge device compatibility and network isolation).
-* **Management VLAN (Gray | 10.10.10.0/26):** High-security out-of-band management loop isolating the underlying Proxmox hypervisor bare-metal control interfaces from general user traffic.
+The live project opens with a complete home-lab topology so its functionality can be explored immediately.
+
+### Live application
+
+https://esixtosr.github.io/NetFlow/network/home-lab/
+
+### Recorded walkthrough
+
+[Open the NetFlow WebM demonstration](./assets/videos/netflow-demo.webm)
+
+> The demonstration recording shows device selection, network profiles, VLAN details, wireless clients, port assignments, and connection highlighting.
 
 ---
 
-## 🗂️ Project Repository Structure
+## Example Architecture
+
+The included topology models several isolated network areas:
+
+| Network | Purpose |
+|---|---|
+| Management VLAN | Hypervisor and infrastructure management |
+| Enterprise VLAN | Domain controllers, security systems, and enterprise services |
+| Projects VLAN | Development, testing, media, and security lab systems |
+| Home VLAN | Trusted personal devices and home wireless clients |
+| IoT VLAN | Smart-home and restricted wireless devices |
+
+Core infrastructure includes:
+
+```text
+Internet
+   │
+UCG-Fiber Gateway
+   ├── U7 Pro Access Point
+   ├── USW-Flex-2.5G Switch
+   ├── Workstation
+   └── Additional wired endpoints
+
+USW-Flex-2.5G
+   ├── Proxmox
+   ├── Domain Controllers
+   ├── Security and monitoring servers
+   ├── Raspberry Pi systems
+   └── Other physical infrastructure
+```
+
+This topology is an example environment and can be replaced with a custom network.
+
+---
+
+## Technical Design
+
+NetFlow uses a modular client-side architecture.
 
 ```text
 NetFlow/
 ├── assets/
-│   └── icons/
-│       ├── favicon-32x32.png
-│       └── netflow-favicon.png
+│   ├── icons/
+│   ├── images/
+│   └── videos/
 ├── css/
 │   └── styles.css
+├── data/
 ├── js/
-│   ├── app.js            # Core orchestration layer
-│   ├── canvas.js         # Canvas state rendering and viewport math
-│   ├── config.js         # Network type definitions and global structural rules
-│   ├── connections.js    # Port-aware mapping and vector lines routing
-│   ├── devices.js        # Node lifecycle and hardware profile logic
-│   ├── export.js         # Canvas recording pipelines and serialization engine
-│   ├── history.js        # Undo/Redo historical snapshot array controls
-│   ├── icons.js          # Programmatic SVGs and graphic templates
-│   ├── main.js           # Launch sequencer and initialization
-│   ├── modals.js         # Window interfaces and validation screens
-│   ├── sidebar.js        # Element controls handler
-│   ├── state.js          # Unified runtime data state tracking
-│   ├── storage.js        # LocalStorage serialization rules
-│   ├── zones.js          # VLAN containment and boundary handling
-│   └── vendor/
-│       ├── gif.js        # Multithreaded background gif compression workers
-│       └── gif.worker.js
-├── index.html            # Main canvas presentation wrapper
-└── README.md             # Systems documentation
+│   ├── app.js
+│   ├── canvas.js
+│   ├── config.js
+│   ├── connections.js
+│   ├── devices.js
+│   ├── export.js
+│   ├── history.js
+│   ├── icons.js
+│   ├── main.js
+│   ├── modals.js
+│   ├── sidebar.js
+│   ├── state.js
+│   ├── storage.js
+│   └── zones.js
+├── network/
+│   └── home-lab/
+├── index.html
+└── README.md
 ```
 
----
+### Technologies
 
-## 🛠️ Security & Networking Implementation Stack
+- JavaScript
+- HTML5 Canvas API
+- HTML and CSS
+- Browser LocalStorage
+- MediaRecorder API
+- JSON serialization
+- GitHub Pages
 
-- **Graphics Processing:** Raw HTML5 2D Canvas API (Zero external design framework dependencies).
-- **Traffic Capture Engineering:** Native Browser MediaRecorder API.
-- **Persistence Engine:** LocalStorage system state caching.
-- **Portability Format:** Structured JSON state schema.
-
----
-
-## ▶️ Setup & Local Operations
-
-To launch NetFlow locally while preserving modern script modularity, run the application using a standard local development server:
-
-### Using VS Code Live Server Extension:
-1. Open the project root folder inside VS Code.
-2. Right-click on `index.html`.
-3. Choose **Open with Live Server**.
-4. Access the loopback endpoint inside your web browser:
-   ```text
-   http://127.0.0.1:5500/index.html
-   ```
+No application server, database, account, or installation is required for the hosted demonstration.
 
 ---
 
-## 🎯 Strategic Portfolio Purpose
+## Run Locally
 
-NetFlow is engineered to demonstrate applied competence in **Systems Security Engineering**, **Network Segmentation**, and **Interactive Client-Side Software Design**. It highlights core engineering domains, including:
+Clone the repository:
 
-- **Enterprise Baseline Configuration:** Mapping and blueprinting complex network environments utilizing recognized architecture standards.
-- **Zero-Trust Network Isolation:** Visualizing macro and micro-segmentation models (*e.g., isolating production environments, management loops, and untrusted IoT devices*).
-- **Asynchronous Front-End State Management:** Maintaining a single, complex source of truth handling intersecting device matrix states, connection tables, and physical canvas properties synchronously.
+```bash
+git clone https://github.com/esixtosr/NetFlow.git
+cd NetFlow
+```
+
+Start a local web server:
+
+```bash
+python3 -m http.server 8000
+```
+
+Open:
+
+```text
+http://localhost:8000
+```
+
+A local server is recommended because the application uses JavaScript modules that may not work correctly when `index.html` is opened directly from the filesystem.
 
 ---
 
-## 👤 Author
+## Current Project Status
 
-Engineered by Edwin I. Sixtos Ruiz as part of an advanced cybersecurity and enterprise network engineering portfolio.# NetFlow
+NetFlow currently supports:
+
+- Device and VLAN creation
+- Canvas positioning and rotation
+- Port counts and port assignments
+- Wired and wireless connections
+- Device-specific network profiles
+- SSID and wireless-client relationships
+- VLAN inheritance and infrastructure overrides
+- Connection highlighting
+- Undo and redo
+- JSON, PNG, and video export
+- Browser-side project persistence
+
+## Planned Improvements
+
+- Improved automatic connection routing
+- Expanded switch and firewall interface roles
+- Additional device templates
+- Connection validation and topology warnings
+- Search and filtering for large environments
+- Optional network inventory and documentation reports
+- Improved mobile and tablet controls
+
+---
+
+## Why I Built It
+
+NetFlow began as a way to document my own home-lab network without separating the physical topology, VLAN plan, port assignments, and device inventory across several diagrams and spreadsheets.
+
+It has grown into a broader network planning tool that combines cybersecurity, network engineering, and front-end development in one project.
+
+The project demonstrates practical experience with:
+
+- Network segmentation
+- VLAN design
+- Physical and logical topology documentation
+- Port and interface mapping
+- IP addressing
+- Wireless infrastructure
+- Client-side state management
+- Interactive canvas development
+- Technical documentation
+
+---
+
+## Author
+
+**Edwin I. Sixtos Ruiz**
+
+Cybersecurity and Network Engineering student at Purdue University.
+
+[GitHub Profile](https://github.com/esixtosr)
+
+---
+
+## License
+
+This project is currently maintained as a personal portfolio and educational project.

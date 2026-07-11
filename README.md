@@ -9,7 +9,6 @@
 A browser-based network architecture workbench for designing physical connections, documenting port assignments, organizing VLANs, and visualizing segmented environments.
 
 [Launch Live Demo](https://esixtosr.github.io/NetFlow/network/home-lab/) ·
-[Watch Demo](./assets/videos/netflow-demo.webm) ·
 [View Source](https://github.com/esixtosr/NetFlow)
 
 </div>

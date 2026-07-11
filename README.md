@@ -16,7 +16,7 @@ A browser-based network architecture workbench for designing physical connection
 
 ---
 
-[![NetFlow topology overview](./assets/images/netflow-overview.png)](https://esixtosr.github.io/NetFlow/network/home-lab/)
+[![NetFlow interactive topology demo](./assets/videos/netflow.gif)](https://esixtosr.github.io/NetFlow/network/home-lab/)
 
 ## Overview
 

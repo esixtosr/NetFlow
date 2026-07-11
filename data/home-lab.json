@@ -1197,7 +1197,7 @@
       "gatewayOverride": "",
       "dnsOverride": "",
       "ipMemoryByVlan": {
-        "zone-6": "10.20.20.20"
+        "zone-6": "10.20.20.11"
       },
       "portCount": 1,
       "ports": [

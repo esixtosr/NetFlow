@@ -1375,6 +1375,45 @@
       "w": 261,
       "h": 95.4,
       "id": 31
+    },
+    {
+      "name": "US-M-NAS01",
+      "sub": "Windows 11 VM ",
+      "type": "database",
+      "status": "online",
+      "color": "#3b9eff",
+      "baseColor": "#3b9eff",
+      "iconLeft": "auto",
+      "iconRight": "",
+      "rotation": 0,
+      "wifiBands": null,
+      "ipAddress": "10.20.20.22",
+      "gatewayOverride": "",
+      "dnsOverride": "",
+      "ipMemoryByVlan": {
+        "zone-4": "10.30.30.11",
+        "zone-6": "10.20.20.22"
+      },
+      "portCount": 1,
+      "ports": [
+        {
+          "id": 1,
+          "name": "Port 1",
+          "type": "ethernet",
+          "mode": "single",
+          "connectedTo": [],
+          "vlan": "",
+          "ip": "",
+          "subnet": "",
+          "dhcp": true,
+          "speed": ""
+        }
+      ],
+      "x": -174.6697736150188,
+      "y": 626.9448107242528,
+      "w": 261,
+      "h": 95.4,
+      "id": 32
     }
   ],
   "connections": [
@@ -1930,6 +1969,23 @@
       "points": [],
       "fromSide": "auto",
       "toSide": "auto"
+    },
+    {
+      "id": 61,
+      "from": 32,
+      "to": 24,
+      "fromPort": 1,
+      "toPort": 2,
+      "label": "",
+      "note": "",
+      "style": "solid",
+      "shape": "smart",
+      "status": "online",
+      "linkType": "wired",
+      "color": "",
+      "points": [],
+      "fromSide": "top",
+      "toSide": "auto"
     }
   ],
   "zones": [
@@ -2025,12 +2081,12 @@
       "x": -209.31619622356445,
       "y": -170.98926710919284,
       "w": 330.29284521709127,
-      "h": 793.464892293135,
+      "h": 912.1482202035374,
       "rotation": 0
     }
   ],
-  "nextDeviceId": 32,
-  "nextConnectionId": 61,
+  "nextDeviceId": 33,
+  "nextConnectionId": 62,
   "nextZoneId": 7,
   "selectedType": null,
   "selectedId": null,
@@ -2038,8 +2094,8 @@
   "clipboard": {
     "devices": [
       {
-        "name": "US-M-PI01",
-        "sub": "Raspberry Pi 5",
+        "name": "US-WIN11-01",
+        "sub": "Windows 11 VM ",
         "type": "other",
         "status": "online",
         "color": "#3b9eff",
@@ -2048,17 +2104,17 @@
         "iconRight": "",
         "rotation": 0,
         "wifiBands": null,
-        "ipAddress": "10.20.20.60",
+        "ipAddress": "10.20.20.15",
         "gatewayOverride": "",
         "dnsOverride": "",
         "ipMemoryByVlan": {
           "zone-4": "10.30.30.11",
-          "zone-6": "10.20.20.60"
+          "zone-6": "10.20.20.15"
         },
         "portCount": 1,
         "ports": [],
         "x": -174.6697736150188,
-        "y": 374.94481072425276,
+        "y": 500.94481072425276,
         "w": 261,
         "h": 95.4
       }
@@ -2068,9 +2124,9 @@
   },
   "clipboardMode": "copy",
   "selectionBox": null,
-  "viewX": 1282.3260539483713,
-  "viewY": 329.1226788480009,
-  "zoom": 0.670754331855715,
+  "viewX": 1381.9419396793314,
+  "viewY": 310.71652210111614,
+  "zoom": 0.6148036493697947,
   "showPorts": false,
   "packetSpeed": 1.05,
   "animationMode": "running",

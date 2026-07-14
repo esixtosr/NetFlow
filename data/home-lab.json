@@ -1529,7 +1529,7 @@
       "note": "",
       "style": "solid",
       "shape": "smart",
-      "status": "online",
+      "status": "blocked",
       "linkType": "wired",
       "color": "",
       "points": [],
@@ -1614,7 +1614,7 @@
       "note": "",
       "style": "solid",
       "shape": "smart",
-      "status": "online",
+      "status": "offline",
       "linkType": "wired",
       "color": "",
       "points": [],
@@ -1648,32 +1648,32 @@
       "note": "",
       "style": "solid",
       "shape": "smart",
-      "status": "online",
+      "status": "warning",
       "linkType": "wired",
       "color": "",
       "points": [
         {
-          "x": -1151.055029610063,
-          "y": 816.1640079484634
+          "x": -1154.7458125973362,
+          "y": 800.9580437746887
         },
         {
-          "x": -1151.055029610063,
-          "y": 507.60505305007075
+          "x": -1154.7458125973362,
+          "y": 573.0016050815451
         },
         {
-          "x": -924.6449442963848,
-          "y": 507.60505305007075
+          "x": -902.6328003227948,
+          "y": 573.0016050815451
         },
         {
-          "x": -926.2231386823597,
-          "y": 154.25443233356953
+          "x": -902.6328003227948,
+          "y": 127.33086080267813
         },
         {
-          "x": -808.8052687506772,
-          "y": 154.25443233356953
+          "x": -808.1391689703524,
+          "y": 127.33086080267813
         }
       ],
-      "fromSide": "left",
+      "fromSide": "right",
       "toSide": "left"
     },
     {
@@ -1686,7 +1686,7 @@
       "note": "",
       "style": "solid",
       "shape": "smart",
-      "status": "online",
+      "status": "offline",
       "linkType": "wired",
       "color": "",
       "points": [],
@@ -2124,15 +2124,15 @@
   },
   "clipboardMode": "copy",
   "selectionBox": null,
-  "viewX": 1381.9419396793314,
-  "viewY": 310.71652210111614,
-  "zoom": 0.6148036493697947,
+  "viewX": 1401.0867370307158,
+  "viewY": 304.7902554132363,
+  "zoom": 0.6236585028647035,
   "showPorts": false,
   "packetSpeed": 1.05,
   "animationMode": "running",
   "fontSize": 17,
   "boxScale": 0.9,
-  "sidebarHidden": true,
+  "sidebarHidden": false,
   "highlightedConnectionId": null,
   "highlightedPortKey": null,
   "inspectorOpen": true

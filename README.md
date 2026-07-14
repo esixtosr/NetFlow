@@ -157,13 +157,6 @@ The live project opens with a complete home-lab topology so its functionality ca
 ### Live application
 
 https://esixtosr.github.io/NetFlow/network/home-lab/
-
-### Recorded walkthrough
-
-[Open the NetFlow WebM demonstration](./assets/videos/netflow-demo.webm)
-
-> The demonstration recording shows device selection, network profiles, VLAN details, wireless clients, port assignments, and connection highlighting.
-
 ---
 
 ## Example Architecture
